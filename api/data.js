@@ -1,11 +1,12 @@
 import { sql, init, getUser, send } from './_lib.js';
 import { applyWrite } from './_rules.js';
 
-const KEYS = ['stops', 'tickets', 'inspections'];
+const KEYS = ['stops', 'tickets', 'inspections', 'devices'];
 const CAN_WRITE = {
   stops: ['admin', 'inspector', 'dispatcher'],
   tickets: ['admin', 'inspector', 'dispatcher', 'citizen'],
   inspections: ['admin', 'inspector'],
+  devices: ['admin'],
 };
 
 export default async function handler(req, res) {
@@ -34,7 +35,7 @@ export default async function handler(req, res) {
       const key = req.query.key;
       if (!KEYS.includes(key)) return send(res, 400, { error: 'Неизвестная коллекция' });
       if (!CAN_WRITE[key].includes(user.role)) return send(res, 403, { error: 'Недостаточно прав' });
-      const rows = await sql`SELECT key, data FROM collections WHERE key IN ('stops','tickets','inspections','notifications')`;
+      const rows = await sql`SELECT key, data FROM collections WHERE key IN ('stops','tickets','inspections','notifications','devices')`;
       const col = Object.fromEntries(rows.map(r => [r.key, r.data]));
       const users = await sql`SELECT id,name,role,district FROM users`;
       const r = applyWrite(key, req.body, col[key] || [], user, { stops: col.stops || [], users });

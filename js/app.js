@@ -4,6 +4,7 @@
         this.stops = this.load('tc_stops', INITIAL_STOPS);
         this.tickets = this.load('tc_tickets', INITIAL_TICKETS);
         this.inspections = this.load('tc_inspections', INITIAL_INSPECTIONS);
+        this.devices = this.load('tc_devices', typeof INITIAL_DEVICES !== 'undefined' ? INITIAL_DEVICES : []);
         this.currentUser = this.load('tc_curr_user', null);
 
         this.map = null;
@@ -20,6 +21,10 @@
 
         this.modalMap = null;
         this.modalMarker = null;
+
+        this.telemetryLogs = [];
+        this._verifiedQrStopId = null;
+        this._activeQrStop = null;
       }
 
       load(key, fallback) {
@@ -64,6 +69,7 @@
           this.stops = d.stops || this.stops;
           this.tickets = d.tickets || this.tickets;
           this.inspections = d.inspections || this.inspections;
+          this.devices = d.devices || this.devices;
         } catch (err) {
           console.warn('Сервер данных временно недоступен, работаем с локальными данными:', err);
         }
@@ -90,7 +96,7 @@
       persist(key, data) {
         const k = key.replace('tc_', '');
         try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {}
-        if (!['stops', 'tickets', 'inspections'].includes(k)) return true;
+        if (!['stops', 'tickets', 'inspections', 'devices'].includes(k)) return true;
         this._t = this._t || {};
         clearTimeout(this._t[k]);
         this._dirty = true;
@@ -112,9 +118,19 @@
           this.hideAuth();
           this.applyUserRoleUI();
           this.startSync();
+          this.handleUrlParams();
         } catch (e) {
           this.currentUser = null;
           this.showAuth();
+          const p = new URLSearchParams(window.location.search);
+          if (p.has('action') && p.has('stopId')) {
+            const act = p.get('action');
+            if (act === 'report') {
+              this.demoLogin('citizen');
+            } else if (act === 'inspect') {
+              this.demoLogin('inspector');
+            }
+          }
         }
       }
 
@@ -339,6 +355,7 @@
           this.hideAuth();
           this.applyUserRoleUI();
           this.startSync();
+          this.handleUrlParams();
           return r.user;
         } catch (e) { this.showToast(e.message, 'warning'); }
       }
@@ -429,6 +446,7 @@
           tabs = [
             { id: 'map', label: 'Карта остановок', icon: 'fa-map' },
             { id: 'registry', label: 'Реестр комплексов', icon: 'fa-list-check' },
+            { id: 'devices', label: 'Устройства IoT', icon: 'fa-microchip' },
             { id: 'dispatcher', label: 'Диспетчерская', icon: 'fa-headset' },
             { id: 'analytics', label: 'Аналитика и KPI', icon: 'fa-chart-pie' },
             { id: 'users', label: 'Пользователи', icon: 'fa-users-gear' }
@@ -436,12 +454,14 @@
         } else if (role === 'dispatcher') {
           tabs = [
             { id: 'dispatcher', label: 'Канбан заявок', icon: 'fa-headset' },
+            { id: 'devices', label: 'Датчики IoT', icon: 'fa-microchip' },
             { id: 'map', label: 'Карта сети', icon: 'fa-map' },
             { id: 'analytics', label: 'Аналитика и SLA', icon: 'fa-chart-pie' }
           ];
         } else if (role === 'inspector') {
           tabs = [
             { id: 'inspector', label: 'Чек-лист осмотра', icon: 'fa-clipboard-check' },
+            { id: 'devices', label: 'Стенд IoT', icon: 'fa-microchip' },
             { id: 'map', label: 'Карта объектов', icon: 'fa-map' }
           ];
         } else {
@@ -460,7 +480,7 @@
       }
 
       switchView(viewId) {
-        const viewIds = ['map', 'registry', 'dispatcher', 'inspector', 'citizen-report', 'citizen-tickets', 'analytics', 'users'];
+        const viewIds = ['map', 'registry', 'dispatcher', 'inspector', 'citizen-report', 'citizen-tickets', 'analytics', 'users', 'devices'];
         viewIds.forEach(id => {
           const el = document.getElementById(`view-${id}`);
           if (el) el.classList.toggle('hidden', id !== viewId);
@@ -485,6 +505,10 @@
 
         if (viewId === 'analytics') {
           setTimeout(() => this.renderAnalyticsCharts(), 150);
+        }
+
+        if (viewId === 'devices') {
+          this.renderDevicesTable();
         }
       }
 
@@ -691,7 +715,13 @@
               const photo = this.safePhoto(i.photo);
               return `
               <div class="p-3 rounded-xl border border-slate-200 bg-white mb-2.5">
-                <div class="flex items-center justify-between"><span class="text-[11px] font-mono font-bold text-indigo-600">${this.esc(i.id)}</span>${resBadge(i.result)}</div>
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-[11px] font-mono font-bold text-indigo-600">${this.esc(i.id)}</span>
+                    ${i.verifiedOnSite ? '<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300"><i class="fa-solid fa-qrcode text-emerald-600"></i> на объекте</span>' : ''}
+                  </div>
+                  ${resBadge(i.result)}
+                </div>
                 <div class="text-xs font-bold text-slate-800 mt-1"><i class="fa-solid fa-user-shield text-slate-400 mr-1"></i>${this.esc(i.inspector)}</div>
                 <div class="text-[10px] text-slate-500 mt-0.5"><i class="fa-regular fa-clock mr-1"></i>${this.esc(i.date)}</div>
                 ${i.notes ? `<p class="text-[11px] text-slate-600 bg-slate-50 rounded-lg p-2 mt-2 border border-slate-100">${this.esc(i.notes)}</p>` : ''}
@@ -713,7 +743,13 @@
               const photo = this.safePhoto(t.photo);
               return `
               <div class="p-3 rounded-xl border border-slate-200 bg-white mb-2.5">
-                <div class="flex items-center justify-between"><span class="text-[11px] font-mono font-bold text-indigo-600">${this.esc(t.id)}</span>${stBadge[t.status] || ''}</div>
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-[11px] font-mono font-bold text-indigo-600">${this.esc(t.id)}</span>
+                    ${t.source === 'sensor' ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-solid fa-microchip mr-0.5"></i>датчик</span>' : ''}
+                  </div>
+                  ${stBadge[t.status] || ''}
+                </div>
                 <div class="text-xs font-bold text-slate-800 mt-1">${this.esc(t.category)}</div>
                 <p class="text-[11px] text-slate-600 bg-slate-50 rounded-lg p-2 mt-1.5 border border-slate-100">${this.esc(t.description)}</p>
                 ${photo ? `<img src="${photo}" class="w-full h-28 object-cover rounded-lg mt-2 border border-slate-200" alt="Фото дефекта">` : ''}
@@ -726,6 +762,7 @@
 
         const actionHtml = `
           <div class="pt-4 border-t border-slate-100 mt-4 space-y-2">
+            <button onclick="app.openQrPlateModal('${this.esc(stop.id)}')" class="w-full py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1.5"><i class="fa-solid fa-qrcode"></i><span>Информационная QR-табличка для печати</span></button>
             ${this.currentUser.role === 'citizen' ? `<button onclick="app.reportFromStopCard('${this.esc(stop.id)}')" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-200 transition-colors flex items-center justify-center space-x-2"><i class="fa-solid fa-bullhorn"></i><span>Сообщить о поломке на этой остановке</span></button>` : (this.currentUser.role === 'inspector' ? `<button onclick="app.startInspectionFor('${this.esc(stop.id)}')" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-200 transition-colors flex items-center justify-center space-x-2"><i class="fa-solid fa-clipboard-check"></i><span>Провести осмотр комплекса</span></button>` : `
               <div class="grid grid-cols-2 gap-2">
                 <button onclick="app.editStop('${this.esc(stop.id)}')" class="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-200 transition-colors flex items-center justify-center space-x-1.5"><i class="fa-solid fa-pen-to-square"></i><span>Редактировать</span></button>
@@ -803,7 +840,13 @@
           card.className = "bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-2 hover:shadow-md transition-shadow";
           const photoUrl = this.safePhoto(t.photo);
           card.innerHTML = `
-            <div class="flex items-center justify-between"><span class="text-[11px] font-mono font-bold text-indigo-600">${this.esc(t.id)}</span>${severityBadges[t.severity] || ''}</div>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-[11px] font-mono font-bold text-indigo-600">${this.esc(t.id)}</span>
+                ${t.source === 'sensor' ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-solid fa-microchip mr-0.5"></i>датчик IoT</span>' : ''}
+              </div>
+              ${severityBadges[t.severity] || ''}
+            </div>
             <div class="font-bold text-xs text-slate-900 leading-snug">${this.esc(t.stopName)}</div>
             <div class="text-[11px] text-slate-500 font-medium">${this.esc(t.category)} (${this.esc(t.city)}) ${this.isOverdue(t) ? '<span class="text-[10px] font-bold text-white bg-rose-600 px-1.5 py-0.5 rounded animate-pulse">Просрочено</span>' : ''}</div>${this.lastHist(t)}
             <p class="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100">${this.esc(t.description)}</p>
@@ -978,13 +1021,18 @@
         const resultLevel = hasDanger ? 'danger' : (hasWarning ? 'warning' : 'good');
         const notes = document.getElementById('insp-notes')?.value || '';
 
+        const wasVerified = this._verifiedQrStopId === stop.id;
         const newInspection = {
           id: 'INS-' + Math.floor(2000 + Math.random() * 8000),
           stopId: stop.id, stopName: stop.name, city: stop.city,
           inspector: this.currentUser.name,
           date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-          result: resultLevel, notes: notes, results: results, photo: this.inspPhotoData || null
+          result: resultLevel, notes: notes, results: results, photo: this.inspPhotoData || null,
+          verifiedOnSite: wasVerified
         };
+
+        this._verifiedQrStopId = null;
+        document.getElementById('insp-qr-verified-banner')?.classList.add('hidden');
 
         this.inspections.unshift(newInspection);
         this.persist('tc_inspections', this.inspections);
@@ -1007,7 +1055,7 @@
         }
 
         this.recalculateStopStatus(stop.id);
-        this.showToast(`Акт осмотра ${stop.name} зарегистрирован!`, 'success');
+        this.showToast(wasVerified ? `Акт осмотра ${stop.name} зарегистрирован (QR-код подтверждён на объекте)!` : `Акт осмотра ${stop.name} зарегистрирован!`, 'success');
 
         const notesEl = document.getElementById('insp-notes');
         if (notesEl) notesEl.value = '';
@@ -1152,7 +1200,10 @@
             <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
               <div class="flex items-start justify-between gap-3">
                 <div>
-                  <span class="text-xs font-mono font-bold text-indigo-600">${this.esc(t.id)}</span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-xs font-mono font-bold text-indigo-600">${this.esc(t.id)}</span>
+                    ${t.source === 'sensor' ? '<span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-solid fa-microchip mr-0.5"></i>датчик IoT</span>' : ''}
+                  </div>
                   <h3 class="text-sm font-bold text-slate-900 mt-0.5">${this.esc(t.stopName)}</h3>
                   <div class="text-[11px] text-slate-500">${this.esc(t.category)} &bull; ${this.esc(t.city)} &bull; ${this.esc(t.createdDate)}</div>
                 </div>
@@ -1187,7 +1238,8 @@
             <td class="p-3.5 max-w-xs truncate">${this.esc(s.routes)}</td>
             <td class="p-3.5"><div class="text-[11px] text-slate-500">${(s.equipment || []).slice(0, 3).map(e => this.esc(e)).join(', ')}${(s.equipment || []).length > 3 ? '...' : ''}</div></td>
             <td class="p-3.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${s.status === 'good' ? 'bg-emerald-100 text-emerald-800' : (s.status === 'warning' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800')}">${s.status === 'good' ? 'Исправно' : (s.status === 'warning' ? 'Внимание' : 'Аварийно')}</span></td>
-            <td class="p-3.5 text-right whitespace-nowrap">
+            <td class="p-3.5 text-right whitespace-nowrap space-x-0.5">
+              <button onclick="app.openQrPlateModal('${this.esc(s.id)}')" class="w-7 h-7 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition-colors" title="Напечатать QR-табличку"><i class="fa-solid fa-qrcode"></i></button>
               <button onclick="app.showOnMap('${this.esc(s.id)}')" class="w-7 h-7 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Показать на карте"><i class="fa-solid fa-map-location-dot"></i></button>
               <button onclick="app.editStop('${this.esc(s.id)}')" class="w-7 h-7 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Редактировать"><i class="fa-solid fa-pen"></i></button>
               <button onclick="app.confirmDeleteStop('${this.esc(s.id)}')" class="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Списать остановку"><i class="fa-solid fa-trash"></i></button>
@@ -1531,6 +1583,446 @@
         if (cancelBtn) cancelBtn.onclick = () => { cleanup(); };
       }
 
+      // ================= IoT Devices & Telemetry =================
+
+      renderDevicesTable() {
+        const tbody = document.getElementById('devices-table-body');
+        if (!tbody) return;
+
+        const totalEl = document.getElementById('stat-total-devices');
+        const onlineEl = document.getElementById('stat-online-devices');
+        const alarmEl = document.getElementById('stat-alarm-devices');
+        const stopsEl = document.getElementById('stat-qr-stops');
+
+        const total = (this.devices || []).length;
+        const online = (this.devices || []).filter(d => d.status === 'online').length;
+        const alarm = (this.devices || []).filter(d => d.status === 'alarm').length;
+        const boundStops = new Set((this.devices || []).map(d => d.stopId)).size;
+
+        if (totalEl) totalEl.textContent = total;
+        if (onlineEl) onlineEl.textContent = online;
+        if (alarmEl) alarmEl.textContent = alarm;
+        if (stopsEl) stopsEl.textContent = `${boundStops} из ${this.stops.length}`;
+
+        if (total === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400">Нет зарегистрированных устройств. Нажмите «Зарегистрировать контроллер».</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = this.devices.map(d => {
+          const stop = this.stops.find(s => s.id === d.stopId);
+          const stopName = stop ? stop.name : (d.stopName || 'Не привязана');
+          const cityName = stop ? stop.city : (d.city || 'Великий Новгород');
+          const isAlarm = d.status === 'alarm';
+          const sensorsList = Array.isArray(d.sensors) ? d.sensors.join(', ') : 'Освещение, Удар (MPU6050)';
+
+          return `
+            <tr class="hover:bg-slate-50 transition-colors">
+              <td class="p-3.5">
+                <div class="font-bold text-slate-800">${this.esc(d.name)}</div>
+                <div class="text-[10px] text-slate-400 font-mono">ID: ${this.esc(d.id)} • ${this.esc(d.model || d.firmware || 'STM32F401RE')}</div>
+              </td>
+              <td class="p-3.5">
+                <div class="font-semibold text-slate-700">${this.esc(stopName)}</div>
+                <div class="text-[10px] text-slate-400">${this.esc(cityName)}</div>
+              </td>
+              <td class="p-3.5 max-w-xs">
+                <div class="text-[11px] text-slate-600 truncate" title="${this.esc(sensorsList)}">${this.esc(sensorsList)}</div>
+              </td>
+              <td class="p-3.5 font-mono text-[11px]">
+                <div class="flex items-center gap-1.5">
+                  <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200 select-all">${this.esc(d.apiKey || 'dkey_default')}</span>
+                  <button onclick="app.copyApiKey('${this.esc(d.apiKey)}')" class="text-slate-400 hover:text-indigo-600 transition-colors" title="Копировать ключ"><i class="fa-regular fa-copy"></i></button>
+                </div>
+              </td>
+              <td class="p-3.5">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isAlarm ? 'bg-rose-100 text-rose-800 animate-pulse' : 'bg-emerald-100 text-emerald-800'}">
+                  ${isAlarm ? '🔴 Тревога' : '🟢 В сети'}
+                </span>
+              </td>
+              <td class="p-3.5">
+                <div class="text-[11px] text-slate-600">${this.esc(d.lastSeen || 'недавно')}</div>
+                <div class="text-[10px] text-slate-400 truncate max-w-[140px]" title="${this.esc(d.lastDetails || '')}">${this.esc(d.lastDetails || 'Опрос датчиков OK')}</div>
+              </td>
+              <td class="p-3.5 text-right whitespace-nowrap space-x-1">
+                <button onclick="app.openQrPlateModal('${this.esc(d.stopId)}')" class="px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-[11px] font-bold border border-purple-200 transition-colors" title="Печать QR-таблички"><i class="fa-solid fa-qrcode mr-1"></i>QR-табличка</button>
+                <button onclick="app.openEmulatorModal('${this.esc(d.id)}')" class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-[11px] font-bold border border-amber-200 transition-colors" title="Открыть стенд STM32"><i class="fa-solid fa-play mr-1"></i>Стенд</button>
+                <button onclick="app.confirmDeleteDevice('${this.esc(d.id)}')" class="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Удалить"><i class="fa-solid fa-trash"></i></button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        this.renderTelemetryLog();
+      }
+
+      async renderTelemetryLog() {
+        const logBox = document.getElementById('telemetry-live-log');
+        if (!logBox) return;
+        try {
+          const r = await this.api('telemetry');
+          const logs = (r.logs || []).slice(-15).reverse();
+          if (logs.length === 0) {
+            logBox.innerHTML = '<div class="text-slate-500 py-2">[ОЖИДАНИЕ] Эфир чист. Нажмите кнопки сценариев на стенде эмуляции STM32.</div>';
+            return;
+          }
+          logBox.innerHTML = logs.map(l => `
+            <div class="flex items-start justify-between py-1.5 border-b border-slate-800/60 last:border-0 text-xs">
+              <div>
+                <span class="text-slate-500 mr-1.5">[${this.esc(l.at)}]</span>
+                <span class="${l.isAlarm ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}">${this.esc(l.deviceName || l.deviceId)}</span>
+                <span class="text-slate-400">(${this.esc(l.stopName)})</span>:
+                <span class="${l.isAlarm ? 'text-amber-200' : 'text-slate-300'}">${this.esc(l.details)}</span>
+              </div>
+              ${l.ticketId ? `<span class="bg-rose-950 text-rose-300 px-2 py-0.5 rounded text-[10px] font-bold border border-rose-800 ml-2 shrink-0">Наряд: ${this.esc(l.ticketId)}</span>` : '<span class="text-emerald-400 text-[10px] ml-2 shrink-0">Heartbeat OK</span>'}
+            </div>
+          `).join('');
+        } catch (e) {}
+      }
+
+      openDeviceModal() {
+        const select = document.getElementById('dev-stop-select');
+        if (select) {
+          select.innerHTML = this.stops.map(s => `<option value="${s.id}">${s.name} (${s.city})</option>`).join('');
+        }
+        const nameInput = document.getElementById('dev-name');
+        if (nameInput) nameInput.value = '';
+        this.regenerateApiKey();
+        document.getElementById('modal-device')?.classList.remove('hidden');
+      }
+
+      closeDeviceModal() {
+        document.getElementById('modal-device')?.classList.add('hidden');
+      }
+
+      regenerateApiKey() {
+        const key = 'dkey_' + Math.random().toString(36).slice(2, 6) + '_' + Math.random().toString(36).slice(2, 8);
+        const el = document.getElementById('dev-apikey');
+        if (el) el.value = key;
+      }
+
+      copyApiKey(key) {
+        if (!key) return;
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(key).then(() => {
+            this.showToast('Секретный ключ скопирован: ' + key, 'success');
+          }).catch(() => {
+            this.showToast('Ключ: ' + key, 'info');
+          });
+        } else {
+          this.showToast('Ключ: ' + key, 'info');
+        }
+      }
+
+      saveDevice(e) {
+        e.preventDefault();
+        const name = document.getElementById('dev-name')?.value.trim();
+        const stopId = document.getElementById('dev-stop-select')?.value;
+        const mcu = document.getElementById('dev-mcu')?.value || 'STM32F401RE';
+        const modem = document.getElementById('dev-modem')?.value || 'SIM800L';
+        const apiKey = document.getElementById('dev-apikey')?.value.trim() || ('dkey_' + Math.random().toString(36).slice(2, 10));
+
+        if (!name || !stopId) {
+          this.showToast('Заполните все обязательные поля', 'warning');
+          return;
+        }
+
+        const stop = this.stops.find(s => s.id === stopId);
+        const sensors = [];
+        if (document.getElementById('sensor-light')?.checked) sensors.push('Освещение (люксометр)');
+        if (document.getElementById('sensor-impact')?.checked) sensors.push('Удар / вибрация (акселерометр)');
+        if (document.getElementById('sensor-glass')?.checked) sensors.push('Акустический датчик стекла');
+        if (document.getElementById('sensor-display')?.checked) sensors.push('Контроль табло (RS-485)');
+
+        const newDev = {
+          id: 'dev-stm32-' + Math.floor(10 + Math.random() * 90),
+          name: name,
+          stopId: stop ? stop.id : stopId,
+          stopName: stop ? stop.name : 'Остановка',
+          city: stop ? stop.city : 'Великий Новгород',
+          apiKey: apiKey,
+          status: 'online',
+          installedDate: new Date().toISOString().slice(0, 10),
+          sensors: sensors.length ? sensors : ['Освещение', 'Удар (MPU6050)'],
+          firmware: `${mcu} + ${modem}`,
+          lastSeen: new Date().toISOString().slice(0, 16).replace('T', ' '),
+          lastEvent: 'ping',
+          lastDetails: 'Штатный опрос датчиков, напряжение 4.1В'
+        };
+
+        this.devices.unshift(newDev);
+        this.persist('tc_devices', this.devices);
+        this.closeDeviceModal();
+        this.renderDevicesTable();
+        this.showToast(`Контроллер «${newDev.name}» успешно зарегистрирован и привязан к «${newDev.stopName}»!`, 'success');
+      }
+
+      confirmDeleteDevice(id) {
+        const d = this.devices.find(x => x.id === id);
+        if (!d) return;
+        this.showConfirmDialog(
+          'Удаление контроллера',
+          `Вы действительно хотите отвязать и удалить контроллер «${d.name}»?`,
+          () => {
+            this.devices = this.devices.filter(x => x.id !== id);
+            this.persist('tc_devices', this.devices);
+            this.renderDevicesTable();
+            this.showToast('Контроллер удалён из реестра', 'info');
+          }
+        );
+      }
+
+      // ================= Official Printable QR-Placard =================
+
+      openQrPlateModal(stopId) {
+        const stop = this.stops.find(s => s.id === stopId) || this.stops[0];
+        if (!stop) return;
+        this._activeQrStop = stop;
+
+        const idEl = document.getElementById('qr-plate-stop-id');
+        const locEl = document.getElementById('qr-plate-location');
+        const nameEl = document.getElementById('qr-plate-stop-name');
+        const routesEl = document.getElementById('qr-plate-routes');
+        const urlEl = document.getElementById('qr-plate-url');
+
+        if (idEl) idEl.textContent = `ID: ${stop.id}`;
+        if (locEl) locEl.textContent = `${stop.city} • ${stop.district || 'Центральный район'}`;
+        if (nameEl) nameEl.textContent = stop.name;
+        if (routesEl) routesEl.textContent = stop.routes || 'Маршруты уточняются';
+
+        const directUrl = `${window.location.origin}${window.location.pathname}?stopId=${encodeURIComponent(stop.id)}&action=report`;
+        if (urlEl) urlEl.textContent = directUrl;
+
+        const container = document.getElementById('qr-canvas-container');
+        if (container) {
+          container.innerHTML = '';
+          if (window.QRCode) {
+            try {
+              new window.QRCode(container, {
+                text: directUrl,
+                width: 180,
+                height: 180,
+                colorDark: '#0f172a',
+                colorLight: '#ffffff',
+                correctLevel: window.QRCode.CorrectLevel.H
+              });
+            } catch (e) {
+              container.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(directUrl)}" class="w-44 h-44 mx-auto" alt="QR-код">`;
+            }
+          } else {
+            container.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(directUrl)}" class="w-44 h-44 mx-auto" alt="QR-код">`;
+          }
+        }
+
+        document.getElementById('modal-qr-plate')?.classList.remove('hidden');
+      }
+
+      closeQrPlateModal() {
+        document.getElementById('modal-qr-plate')?.classList.add('hidden');
+      }
+
+      testScanThisQr() {
+        if (!this._activeQrStop) return;
+        const stopId = this._activeQrStop.id;
+        this.closeQrPlateModal();
+        this.handleUrlParams(stopId, 'report');
+      }
+
+      // ================= STM32 Virtual Interactive Demo Stand =================
+
+      openEmulatorModal(deviceId) {
+        const select = document.getElementById('emu-stop-select');
+        if (select) {
+          select.innerHTML = this.stops.map(s => `<option value="${s.id}">${s.name} (${s.city})</option>`).join('');
+          if (deviceId) {
+            const dev = this.devices.find(d => d.id === deviceId);
+            if (dev && dev.stopId) select.value = dev.stopId;
+          }
+        }
+        this.onEmulatorStopChange();
+        document.getElementById('modal-iot-emulator')?.classList.remove('hidden');
+      }
+
+      closeEmulatorModal() {
+        document.getElementById('modal-iot-emulator')?.classList.add('hidden');
+      }
+
+      onEmulatorStopChange() {
+        const stopId = document.getElementById('emu-stop-select')?.value;
+        const devNameEl = document.getElementById('emu-device-name');
+        const dev = this.devices.find(d => d.stopId === stopId);
+        if (devNameEl) {
+          if (dev) {
+            devNameEl.textContent = `${dev.name} (${dev.id})`;
+            devNameEl.className = 'px-3 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-emerald-400 font-mono font-bold text-xs';
+          } else {
+            devNameEl.textContent = 'Эмулируемый STM32 (dev-virtual)';
+            devNameEl.className = 'px-3 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-amber-400 font-mono font-bold text-xs';
+          }
+        }
+      }
+
+      clearEmulatorLog() {
+        const el = document.getElementById('emu-terminal-log');
+        if (el) el.innerHTML = '<div class="text-slate-500">[STANDBY] Лог очищен. Контроллер готов к передаче пакетов на /api/telemetry...</div>';
+      }
+
+      async sendSimulatedSignal(event, details, params = {}) {
+        const stopId = document.getElementById('emu-stop-select')?.value || (this.stops[0] && this.stops[0].id);
+        const stop = this.stops.find(s => s.id === stopId) || this.stops[0] || { id: 'stop-vn-1', name: 'Кремлёвский парк', city: 'Великий Новгород' };
+        const dev = this.devices.find(d => d.stopId === stop.id) || this.devices[0] || {
+          id: 'dev-demo-stm32',
+          name: 'Демо-контроллер STM32F401',
+          apiKey: 'demo_' + stop.id
+        };
+
+        const term = document.getElementById('emu-terminal-log');
+        const logLine = (msg, cls = 'text-slate-300') => {
+          if (!term) return;
+          const div = document.createElement('div');
+          div.className = cls;
+          div.textContent = `[${new Date().toLocaleTimeString('ru-RU')}] ${msg}`;
+          term.appendChild(div);
+          term.scrollTop = term.scrollHeight;
+        };
+
+        const gsmLed = document.getElementById('emu-led-gsm');
+        const alarmLed = document.getElementById('emu-led-alarm');
+        const alarmLabel = document.getElementById('emu-led-alarm-label');
+
+        if (gsmLed) gsmLed.className = 'w-3 h-3 rounded-full bg-cyan-400 shadow-md shadow-cyan-400 animate-ping';
+
+        const isAlarm = event !== 'ping';
+        if (alarmLed) {
+          if (isAlarm) {
+            alarmLed.className = 'w-3 h-3 rounded-full bg-rose-500 shadow-lg shadow-rose-500 animate-pulse';
+            if (alarmLabel) {
+              alarmLabel.className = 'text-rose-400 font-bold';
+              alarmLabel.textContent = 'ТРЕВОГА АКТИВНА';
+            }
+          } else {
+            alarmLed.className = 'w-3 h-3 rounded-full bg-slate-700';
+            if (alarmLabel) {
+              alarmLabel.className = 'text-slate-500';
+              alarmLabel.textContent = 'ТРЕВОГА';
+            }
+          }
+        }
+
+        logLine(`[STM32-HAL] Прерывание сенсора: event='${event}', объект='${stop.name}'`);
+        logLine(`[SIM800L-AT] AT+HTTPPARA="URL","https://stopcontrol.vercel.app/api/telemetry"`);
+        logLine(`[SIM800L-AT] Отправка POST пакета (X-Device-Key: ${(dev.apiKey || 'key').slice(0, 10)}...)...`, 'text-cyan-400');
+
+        try {
+          const resp = await fetch('/api/telemetry', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Device-Key': dev.apiKey || 'demo_key'
+            },
+            body: JSON.stringify({
+              apiKey: dev.apiKey || 'demo_key',
+              deviceId: dev.id,
+              stopId: stop.id,
+              event: event,
+              details: details,
+              ...params
+            })
+          });
+
+          const data = await resp.json();
+
+          if (gsmLed) gsmLed.className = 'w-3 h-3 rounded-full bg-blue-500 shadow-md shadow-blue-500/50';
+
+          if (resp.ok && data.ok) {
+            logLine(`[HTTP 200 OK] Сервер принял пакет: ${data.message}`, 'text-emerald-400 font-bold');
+            if (data.ticketCreated) {
+              logLine(`[DISPATCHER] Автоматически сформирована заявка: ${data.ticketId} (источник: датчик IoT)`, 'text-amber-300 font-bold');
+              this.showToast(`🚨 Аварийный сигнал с датчика принят! Создана заявка ${data.ticketId} («источник: датчик»)`, 'warning');
+            } else {
+              this.showToast('📡 Телеметрия успешно принята сервером (Heartbeat OK)', 'info');
+            }
+
+            await this.loadData();
+            this.renderAllViews();
+            this.renderBell();
+            if (this.map) this.renderMapMarkers();
+          } else {
+            logLine(`[HTTP ${resp.status}] Ошибка: ${data.error || 'Сбой отправки'}`, 'text-rose-400 font-bold');
+            this.showToast(`Ошибка телеметрии: ${data.error || 'Сбой передачи'}`, 'warning');
+          }
+        } catch (err) {
+          if (gsmLed) gsmLed.className = 'w-3 h-3 rounded-full bg-blue-500 shadow-md shadow-blue-500/50';
+          logLine(`[СЕТЕВОЙ СБОЙ] Ошибка соединения: ${err.message}`, 'text-rose-400');
+          this.showToast('Ошибка сети при отправке телеметрии', 'warning');
+        }
+      }
+
+      // ================= Inspector QR Verification =================
+
+      simulateScanQrOnSite() {
+        const stopId = document.getElementById('insp-stop-id')?.value;
+        const stop = this.stops.find(s => s.id === stopId);
+        if (!stop) {
+          this.showToast('Выберите объект осмотра из списка', 'warning');
+          return;
+        }
+
+        this._verifiedQrStopId = stop.id;
+        const banner = document.getElementById('insp-qr-verified-banner');
+        const bannerName = document.getElementById('insp-qr-stop-name');
+        if (banner) banner.classList.remove('hidden');
+        if (bannerName) bannerName.textContent = `${stop.name} (${stop.city})`;
+
+        this.showToast(`✅ QR-код остановки «${stop.name}» подтверждён! В акт включена отметка «осмотр проведён на объекте».`, 'success');
+      }
+
+      // ================= URL Routing & QR Scanner Target Handling =================
+
+      handleUrlParams(overrideStopId, overrideAction) {
+        const params = new URLSearchParams(window.location.search);
+        const stopId = overrideStopId || params.get('stopId');
+        const action = overrideAction || params.get('action');
+
+        if (!stopId) return;
+
+        const stop = this.stops.find(s => s.id === stopId);
+        if (!stop) return;
+
+        if (action === 'report') {
+          if (!this.currentUser) {
+            this.demoLogin('citizen');
+          }
+          setTimeout(() => {
+            this.switchView('citizen-report');
+            const sel = document.getElementById('report-stop-select');
+            if (sel) {
+              sel.value = stop.id;
+              sel.dispatchEvent(new Event('change'));
+            }
+            this.showToast(`Отсканирован QR-код: ${stop.name}. Заполните форму обращения.`, 'info');
+          }, 350);
+        } else if (action === 'inspect') {
+          this._verifiedQrStopId = stop.id;
+          if (!this.currentUser) {
+            this.demoLogin('inspector');
+          }
+          setTimeout(() => {
+            this.switchView('inspector');
+            const sel = document.getElementById('insp-stop-id');
+            if (sel) {
+              sel.value = stop.id;
+              sel.dispatchEvent(new Event('change'));
+            }
+            const banner = document.getElementById('insp-qr-verified-banner');
+            const bannerName = document.getElementById('insp-qr-stop-name');
+            if (banner) banner.classList.remove('hidden');
+            if (bannerName) bannerName.textContent = `${stop.name} (${stop.city})`;
+            this.showToast(`Осмотр верифицирован на объекте: ${stop.name} (QR подтверждён)`, 'success');
+          }, 350);
+        }
+      }
+
       renderAllViews() {
         this.renderMapMarkers();
         this.renderRegistryTable();
@@ -1538,6 +2030,7 @@
         this.renderInspectorView();
         this.renderCitizenTickets();
         this.renderUsersTable();
+        this.renderDevicesTable();
         if (this.currentUser && this.currentUser.role === 'citizen') {
           this.updateReportStopsList();
         }

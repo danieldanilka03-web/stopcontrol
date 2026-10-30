@@ -136,3 +136,51 @@
       { id: 'INS-2002', stopId: 'stop-vn-3', stopName: 'Ул. Большая Санкт-Петербургская / Завод Волна', city: 'Великий Новгород', inspector: 'Смирнов А. В.', date: '2026-09-28 07:05', result: 'danger', notes: 'Разбита задняя ветрозащитная секция. Есть угроза для пассажиров.', results: [{ item: 'Остекление и ветрозащитные стенки', value: 'danger' },{ item: 'Кровля, навес и водосточные желоба', value: 'ok' },{ item: 'Скамья ожидания (доски, крепления)', value: 'warning' },{ item: 'Урна для мусора (целостность, чистота)', value: 'ok' },{ item: 'Информационное электронное табло', value: 'ok' },{ item: 'Система освещения (светильники, проводка)', value: 'ok' },{ item: 'Тактильная плитка и подходы', value: 'ok' },{ item: 'Отсутствие граффити и наклеек', value: 'ok' }], photo: null }
     ];
 
+    const INITIAL_DEVICES = [
+      {
+        id: "dev-stm32-01",
+        name: "Контроллер павильона Сенная (STM32F4)",
+        stopId: "stop-vn-1",
+        stopName: "Кремлёвский парк / Сенная площадь",
+        city: "Великий Новгород",
+        apiKey: "dkey_vn_sennaya_77a9b1c2",
+        status: "online",
+        installedDate: "2024-03-15",
+        sensors: ["Освещение (люксометр)", "Удар / вибрация (акселерометр)", "Контроль табло (RS-485)", "Датчик двери шкафа"],
+        firmware: "STM32-StopMon v1.4.2",
+        lastSeen: "2026-10-30 23:30",
+        lastEvent: "ping",
+        lastDetails: "Штатный опрос датчиков, напряжение 4.1В"
+      },
+      {
+        id: "dev-stm32-02",
+        name: "Контроллер Вокзальная пл. (STM32F1)",
+        stopId: "stop-vn-2",
+        stopName: "Вокзальная площадь (Ж/Д Вокзал)",
+        city: "Великий Новгород",
+        apiKey: "dkey_vn_vokzal_92f4c3d8",
+        status: "alarm",
+        installedDate: "2023-11-20",
+        sensors: ["Освещение (люксометр)", "Удар / вибрация", "Контроль расписания"],
+        firmware: "STM32-StopMon v1.3.0",
+        lastSeen: "2026-10-30 23:25",
+        lastEvent: "light_failure",
+        lastDetails: "Обрыв линии светодиодной подсветки расписания"
+      },
+      {
+        id: "dev-stm32-03",
+        name: "Контроллер Завод Волна (STM32F4)",
+        stopId: "stop-vn-3",
+        stopName: "Ул. Большая Санкт-Петербургская / Завод Волна",
+        city: "Великий Новгород",
+        apiKey: "dkey_vn_volna_33e1d5a7",
+        status: "alarm",
+        installedDate: "2024-01-10",
+        sensors: ["Акустический датчик разбития", "Акселерометр MPU6050", "Освещение"],
+        firmware: "STM32-StopMon v1.4.2",
+        lastSeen: "2026-10-30 23:10",
+        lastEvent: "impact",
+        lastDetails: "Зафиксирован сильный механический удар 4.8g"
+      }
+    ];
+

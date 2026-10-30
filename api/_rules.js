@@ -14,6 +14,10 @@ export function applyWrite(key, inc, cur, user, ctx) {
   const err = error => ({ error });
   if (!Array.isArray(inc)) return err('Ожидается массив');
   const role = user.role, byId = new Map(cur.map(x => [x.id, x])), incIds = new Set(inc.map(x => x && x.id));
+  if (key === 'devices') {
+    if (role !== 'admin') return err('Управлять устройствами может только администратор');
+    return { data: inc, notes: [] };
+  }
   if (key === 'stops') {
     if (role === 'admin') return { data: inc, notes: [] };
     if (cur.some(x => !incIds.has(x.id)) || inc.some(x => !byId.has(x.id))) return err('Добавлять и удалять остановки может только администратор');

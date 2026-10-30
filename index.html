@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
   <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -182,7 +183,13 @@
           </div>
         </div>
 
-        <div class="flex items-center space-x-3">
+        <div class="flex items-center space-x-2 sm:space-x-3">
+          <button onclick="app.openEmulatorModal()" title="Открыть интерактивный эмулятор микроконтроллера STM32 для демонстрации" class="px-3 py-1.5 rounded-xl border border-indigo-300 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-all shadow-sm flex items-center space-x-1.5 group">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+            <i class="fa-solid fa-microchip text-indigo-600"></i>
+            <span class="hidden sm:inline">Стенд IoT (STM32)</span>
+          </button>
+
           <div class="flex items-center space-x-2.5 pl-2.5 pr-3.5 py-1.5 rounded-2xl bg-slate-50 border border-slate-200">
             <div id="header-avatar" class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white flex items-center justify-center font-bold text-xs shadow-inner">
               АМ
@@ -408,7 +415,24 @@
                 <h2 class="text-base font-bold text-slate-900">Чек-лист технического состояния оборудования</h2>
                 <p id="checklist-stop-title" class="text-xs text-indigo-600 font-semibold mt-0.5">Выберите комплекс из графика слева</p>
               </div>
-              <span class="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-xl border border-blue-100">Акт № ИНСП-2026</span>
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="app.simulateScanQrOnSite()" title="Подтвердить присутствие на остановке по QR-коду" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200 transition-colors flex items-center space-x-1.5">
+                  <i class="fa-solid fa-qrcode text-indigo-600"></i>
+                  <span>Сканировать QR на объекте</span>
+                </button>
+                <span class="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-xl border border-blue-100">Акт № ИНСП-2026</span>
+              </div>
+            </div>
+
+            <div id="insp-qr-verified-banner" class="hidden p-3 bg-emerald-50 border border-emerald-300 rounded-2xl flex items-center justify-between text-xs text-emerald-900 font-bold transition-all">
+              <div class="flex items-center space-x-2.5">
+                <span class="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-sm shadow-sm shrink-0"><i class="fa-solid fa-circle-check"></i></span>
+                <div>
+                  <div class="leading-tight text-emerald-950 font-bold">Осмотр верифицирован по QR-коду</div>
+                  <div class="text-[10px] text-emerald-700 font-medium">Инспектор находится непосредственно на остановочном пункте</div>
+                </div>
+              </div>
+              <span class="px-2.5 py-1 bg-emerald-200 text-emerald-950 rounded-lg text-[10px] uppercase font-bold tracking-wide shrink-0">Геолокация подтверждена</span>
             </div>
 
             <form id="inspection-form" onsubmit="app.submitInspection(event)" class="space-y-4">
@@ -605,6 +629,102 @@
         </div>
       </section>
 
+      <!-- ================= VIEW 9: IOT CONTROLLERS & SENSORS ================= -->
+      <section id="view-devices" class="tab-view hidden w-full h-full overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-4 custom-scroll">
+        <div class="max-w-7xl mx-auto space-y-4">
+
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="text-xs uppercase tracking-wider text-indigo-600 font-bold">IoT Аппаратный комплекс</span>
+                <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 text-xs font-semibold">STM32 Microcontrollers</span>
+              </div>
+              <h2 class="text-lg font-bold text-slate-900 mt-0.5">Устройства, датчики и QR-таблички павильонов</h2>
+              <p class="text-xs text-slate-500">Управление автономными контроллерами остановок, приём сигналов телеметрии и печать QR-кодов</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="app.openEmulatorModal()" class="px-3.5 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow-md shadow-amber-200 transition-colors flex items-center space-x-1.5">
+                <i class="fa-solid fa-play"></i>
+                <span>Стенд эмуляции STM32</span>
+              </button>
+              <button onclick="app.openDeviceModal()" class="px-3.5 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md shadow-indigo-200 transition-colors flex items-center space-x-1.5">
+                <i class="fa-solid fa-plus"></i>
+                <span>Зарегистрировать контроллер</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+              <span class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg font-bold"><i class="fa-solid fa-microchip"></i></span>
+              <div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase">Всего контроллеров</div>
+                <div id="stat-total-devices" class="text-lg font-bold text-slate-900">0</div>
+              </div>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+              <span class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg font-bold"><i class="fa-solid fa-tower-broadcast"></i></span>
+              <div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase">На связи (Online)</div>
+                <div id="stat-online-devices" class="text-lg font-bold text-emerald-600">0</div>
+              </div>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+              <span class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-lg font-bold"><i class="fa-solid fa-bell"></i></span>
+              <div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase">Аварийные сигналы</div>
+                <div id="stat-alarm-devices" class="text-lg font-bold text-rose-600">0</div>
+              </div>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+              <span class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-lg font-bold"><i class="fa-solid fa-qrcode"></i></span>
+              <div>
+                <div class="text-[10px] text-slate-400 font-bold uppercase">Остановок в сети</div>
+                <div id="stat-qr-stops" class="text-lg font-bold text-purple-600">0</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+              <div class="font-bold text-slate-900 text-sm">Реестр аппаратных контроллеров остановочных комплексов</div>
+              <span class="text-xs text-slate-400">Протокол: HTTP POST / GSM-GPRS SIM800L</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-100">
+                  <tr>
+                    <th class="p-3.5">Устройство / Модель</th>
+                    <th class="p-3.5">Привязка к остановке</th>
+                    <th class="p-3.5">Датчики и периферия</th>
+                    <th class="p-3.5">Секретный ключ (API Key)</th>
+                    <th class="p-3.5">Статус</th>
+                    <th class="p-3.5">Последний сигнал</th>
+                    <th class="p-3.5 text-right">Действия</th>
+                  </tr>
+                </thead>
+                <tbody id="devices-table-body" class="divide-y divide-slate-100 font-medium"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Telemetry Live Log -->
+          <div class="bg-slate-900 rounded-3xl p-5 text-white shadow-xl space-y-3 font-mono">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div class="flex items-center space-x-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                <span class="text-xs font-bold text-slate-300">Мониторинг эфира телеметрии контроллеров STM32 в реальном времени</span>
+              </div>
+              <span class="text-[10px] text-slate-500">Эндпоинт: /api/telemetry</span>
+            </div>
+            <div id="telemetry-live-log" class="text-[11px] space-y-1.5 max-h-44 overflow-y-auto custom-scroll text-slate-300">
+              <div class="text-slate-500">[Служба телеметрии готова к приёму пакетов данных с микроконтроллеров]</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -755,6 +875,269 @@
       <div class="flex items-center justify-center gap-2 pt-2">
         <button id="confirm-cancel-btn" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Отмена</button>
         <button id="confirm-ok-btn" class="px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-sm">Подтвердить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= Modal: Регистрация IoT-контроллера ================= -->
+  <div id="modal-device" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 border border-slate-200 shadow-2xl my-auto space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center space-x-2.5">
+          <span class="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-sm font-bold shadow-md shadow-indigo-100"><i class="fa-solid fa-microchip"></i></span>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Регистрация контроллера STM32</h3>
+            <p class="text-[11px] text-slate-400">Привязка телеметрического модуля к остановочному пункту</p>
+          </div>
+        </div>
+        <button onclick="app.closeDeviceModal()" class="text-slate-400 hover:text-slate-700 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <form onsubmit="app.saveDevice(event)" class="space-y-3.5 text-xs">
+        <input type="hidden" id="modal-device-id">
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Название контроллера / серийный номер <span class="text-rose-500">*</span></label>
+          <input type="text" id="dev-name" required placeholder="Например: Контроллер павильона Сенная (STM32F401)" class="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Привязка к остановочному пункту <span class="text-rose-500">*</span></label>
+          <select id="dev-stop-select" required class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-medium outline-none focus:ring-2 focus:ring-indigo-500"></select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Микроконтроллер</label>
+            <select id="dev-mcu" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-medium outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="STM32F401RE (ARM Cortex-M4)">STM32F401RE (Cortex-M4, 84MHz)</option>
+              <option value="STM32F103C8T6 (ARM Cortex-M3)">STM32F103C8T6 (BluePill, 72MHz)</option>
+              <option value="STM32G431KB (Cortex-M4)">STM32G431KB (170MHz)</option>
+              <option value="ESP32-WROOM-32 (Dual-Core)">ESP32-WROOM-32</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Модуль связи</label>
+            <select id="dev-modem" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-medium outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="SIM800L (GSM/GPRS Quad-Band)">SIM800L (GSM/GPRS)</option>
+              <option value="SIM7600E (4G LTE / GPS)">SIM7600E (4G LTE / GPS)</option>
+              <option value="Wi-Fi ESP8266 AT">Wi-Fi ESP8266 (Городская сеть)</option>
+              <option value="NB-IoT BC66">NB-IoT BC66</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1.5">Подключенные датчики и сенсоры</label>
+          <div class="grid grid-cols-2 gap-2 text-[11px] p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="sensor-light" checked class="rounded text-indigo-600"><span>Фоторезистор (Освещение)</span></label>
+            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="sensor-impact" checked class="rounded text-indigo-600"><span>Акселерометр MPU6050 (Удар)</span></label>
+            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="sensor-glass" checked class="rounded text-indigo-600"><span>Акустика разбития стекла</span></label>
+            <label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" id="sensor-display" checked class="rounded text-indigo-600"><span>Мониторинг табло (RS-485)</span></label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Секретный ключ авторизации датчика (API Key)</label>
+          <div class="flex gap-2">
+            <input type="text" id="dev-apikey" readonly class="flex-1 px-3 py-2 rounded-xl border border-slate-300 bg-slate-100 font-mono text-[11px] text-slate-700 select-all outline-none">
+            <button type="button" onclick="app.regenerateApiKey()" class="px-3 py-2 bg-slate-200 hover:bg-slate-300 rounded-xl font-bold text-[11px] text-slate-700 transition-colors" title="Сгенерировать новый ключ"><i class="fa-solid fa-arrows-rotate"></i></button>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-1">Прошивается в исходный код STM32 (`#define DEVICE_API_KEY "..."`)</p>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="app.closeDeviceModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Отмена</button>
+          <button type="submit" class="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md shadow-indigo-200">Сохранить контроллер</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= Modal: Официальная QR-табличка для печати ================= -->
+  <div id="modal-qr-plate" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-xl w-full p-6 border border-slate-200 shadow-2xl my-auto space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 no-print">
+        <div class="flex items-center space-x-2">
+          <span class="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center text-sm font-bold shadow-md shadow-purple-100"><i class="fa-solid fa-qrcode"></i></span>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Информационная QR-табличка остановочного пункта</h3>
+            <p class="text-[11px] text-slate-400">Макет для печати и размещения на физическом павильоне</p>
+          </div>
+        </div>
+        <button onclick="app.closeQrPlateModal()" class="text-slate-400 hover:text-slate-700 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <!-- Printable Area -->
+      <div id="printable-qr-sheet" class="bg-gradient-to-b from-slate-50 to-white border-2 border-slate-800 rounded-2xl p-6 text-center space-y-4 shadow-inner">
+        <div class="flex items-center justify-between border-b-2 border-slate-800 pb-3">
+          <div class="flex items-center space-x-2.5 text-left">
+            <span class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center text-xl font-bold shadow-sm"><i class="fa-solid fa-bus"></i></span>
+            <div>
+              <div class="text-[10px] uppercase font-bold tracking-widest text-slate-500">Министерство транспорта РФ</div>
+              <div class="text-xs font-extrabold text-slate-900 uppercase">Единый мониторинг городского транспорта</div>
+            </div>
+          </div>
+          <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-slate-300 bg-white" id="qr-plate-stop-id">STOP-ID</span>
+        </div>
+
+        <div>
+          <div class="text-[11px] uppercase tracking-wider font-bold text-indigo-600" id="qr-plate-location">Великий Новгород • Район</div>
+          <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight mt-1" id="qr-plate-stop-name">Кремлёвский парк / Сенная площадь</h2>
+          <div class="text-xs text-slate-600 font-medium mt-1">Маршруты: <strong id="qr-plate-routes" class="text-slate-900">—</strong></div>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border-2 border-dashed border-slate-300 inline-block shadow-sm mx-auto">
+          <div id="qr-canvas-container" class="w-48 h-48 mx-auto flex items-center justify-center bg-white"></div>
+          <div class="text-[10px] font-mono text-slate-400 mt-2">Код верификации объекта</div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left pt-2 border-t border-slate-200">
+          <div class="p-3 bg-white rounded-xl border border-slate-200">
+            <div class="text-[11px] font-bold text-emerald-800 flex items-center gap-1.5 mb-0.5">
+              <i class="fa-solid fa-user text-emerald-600"></i>
+              <span>Для пассажиров и горожан:</span>
+            </div>
+            <p class="text-[10px] text-slate-600 leading-snug">Наведите камеру смартфона, чтобы моментально сообщить о поломке, разбитом стекле, неработающем освещении или задержке расписания.</p>
+          </div>
+
+          <div class="p-3 bg-white rounded-xl border border-slate-200">
+            <div class="text-[11px] font-bold text-blue-800 flex items-center gap-1.5 mb-0.5">
+              <i class="fa-solid fa-clipboard-check text-blue-600"></i>
+              <span>Для службы инспекции:</span>
+            </div>
+            <p class="text-[10px] text-slate-600 leading-snug">Сканирование кода инспектором автоматически подтверждает геопривязку и факт проведения технического осмотра на объекте.</p>
+          </div>
+        </div>
+
+        <div class="text-[9px] text-slate-400 font-mono pt-1">
+          Прямая ссылка: <span id="qr-plate-url" class="text-slate-600 break-all"></span>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-2 border-t border-slate-100 no-print">
+        <button type="button" onclick="app.testScanThisQr()" class="px-3.5 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors">
+          <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Протестировать переход по ссылке
+        </button>
+        <div class="flex gap-2">
+          <button type="button" onclick="app.closeQrPlateModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Закрыть</button>
+          <button type="button" onclick="window.print()" class="px-4 py-2 text-xs font-bold bg-slate-900 hover:bg-black text-white rounded-xl shadow-md transition-colors flex items-center space-x-1.5">
+            <i class="fa-solid fa-print"></i>
+            <span>Распечатать табличку</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= Modal: Стенд демонстрации / Эмулятор STM32 ================= -->
+  <div id="modal-iot-emulator" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-slate-950 text-white rounded-3xl max-w-2xl w-full p-6 border border-slate-800 shadow-2xl my-auto space-y-5">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div class="flex items-center space-x-3">
+          <span class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-indigo-600 text-white flex items-center justify-center text-lg font-bold shadow-lg shadow-indigo-900/50">
+            <i class="fa-solid fa-microchip"></i>
+          </span>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h3 class="text-base font-bold text-white tracking-tight">Интерактивный стенд эмулятора контроллера STM32</h3>
+              <span class="text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2 py-0.5 rounded font-mono font-bold">READY</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Имитация работы аппаратного модуля остановочного павильона для защиты проекта</p>
+          </div>
+        </div>
+        <button onclick="app.closeEmulatorModal()" class="text-slate-400 hover:text-white p-1 text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <!-- Hardware Panel Styling -->
+      <div class="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Выбор целевой остановки:</label>
+            <select id="emu-stop-select" onchange="app.onEmulatorStopChange()" class="px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-medium outline-none text-xs focus:ring-2 focus:ring-emerald-500"></select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Привязанный контроллер:</label>
+            <div id="emu-device-name" class="px-3 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-emerald-400 font-mono font-bold text-xs">STM32F401 (dev-stm32-01)</div>
+          </div>
+        </div>
+
+        <!-- Simulated LEDs -->
+        <div class="flex flex-wrap items-center gap-4 p-3 bg-slate-950/80 rounded-xl border border-slate-800 text-[11px] font-mono">
+          <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/50 animate-pulse"></span><span class="text-slate-300">Питание 3.3V</span></div>
+          <div class="flex items-center gap-1.5"><span id="emu-led-gsm" class="w-3 h-3 rounded-full bg-blue-500 shadow-md shadow-blue-500/50"></span><span class="text-slate-300">SIM800L GPRS</span></div>
+          <div class="flex items-center gap-1.5"><span id="emu-led-sensor" class="w-3 h-3 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/50"></span><span class="text-slate-300">ADC / I2C OK</span></div>
+          <div class="flex items-center gap-1.5"><span id="emu-led-alarm" class="w-3 h-3 rounded-full bg-slate-700"></span><span id="emu-led-alarm-label" class="text-slate-500">ТРЕВОГА</span></div>
+        </div>
+
+        <!-- Demonstration Buttons for Defense -->
+        <div>
+          <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
+            <span>Аварийные сценарии (нажмите для демонстрации):</span>
+            <span class="text-emerald-400 text-[10px]">Формирует реальную заявку в БД</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <button type="button" onclick="app.sendSimulatedSignal('impact', 'Механический удар 4.8g по опоре павильона', { gForce: 4.8, lux: 120 })" class="p-3 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/60 rounded-xl text-left transition-all group flex items-start space-x-2.5">
+              <span class="w-8 h-8 rounded-lg bg-rose-600 text-white flex items-center justify-center shrink-0 text-sm font-bold shadow-md"><i class="fa-solid fa-car-burst"></i></span>
+              <div>
+                <div class="font-bold text-rose-200 text-xs group-hover:text-white">Имитировать сильный удар</div>
+                <div class="text-[10px] text-rose-400/80 mt-0.5">ДТП или вандализм (акселерометр > 4g)</div>
+              </div>
+            </button>
+
+            <button type="button" onclick="app.sendSimulatedSignal('light_failure', 'Обрыв цепи питания LED-светильников павильона', { lux: 0, battery: 3.8 })" class="p-3 bg-amber-950/40 hover:bg-amber-900/60 border border-amber-800/60 rounded-xl text-left transition-all group flex items-start space-x-2.5">
+              <span class="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 text-sm font-bold shadow-md"><i class="fa-solid fa-lightbulb"></i></span>
+              <div>
+                <div class="font-bold text-amber-200 text-xs group-hover:text-white">Имитировать обрыв освещения</div>
+                <div class="text-[10px] text-amber-400/80 mt-0.5">Ночью не горит свет (фоторезистор 0 лк)</div>
+              </div>
+            </button>
+
+            <button type="button" onclick="app.sendSimulatedSignal('glass_break', 'Акустический датчик зафиксировал частотный спектр разбития стекла', { gForce: 2.1, lux: 80 })" class="p-3 bg-purple-950/40 hover:bg-purple-900/60 border border-purple-800/60 rounded-xl text-left transition-all group flex items-start space-x-2.5">
+              <span class="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center shrink-0 text-sm font-bold shadow-md"><i class="fa-solid fa-burst"></i></span>
+              <div>
+                <div class="font-bold text-purple-200 text-xs group-hover:text-white">Имитировать разбитие стекла</div>
+                <div class="text-[10px] text-purple-400/80 mt-0.5">Ветрозащитная секция (акустический сенсор)</div>
+              </div>
+            </button>
+
+            <button type="button" onclick="app.sendSimulatedSignal('display_error', 'Потеря ответа табло по протоколу RS-485 Modbus', { battery: 3.9 })" class="p-3 bg-blue-950/40 hover:bg-blue-900/60 border border-blue-800/60 rounded-xl text-left transition-all group flex items-start space-x-2.5">
+              <span class="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 text-sm font-bold shadow-md"><i class="fa-solid fa-tv"></i></span>
+              <div>
+                <div class="font-bold text-blue-200 text-xs group-hover:text-white">Имитировать сбой табло</div>
+                <div class="text-[10px] text-blue-400/80 mt-0.5">Зависание или потеря связи по UART</div>
+              </div>
+            </button>
+          </div>
+
+          <div class="pt-2 text-right">
+            <button type="button" onclick="app.sendSimulatedSignal('ping', 'Штатный опрос сенсоров STM32', { lux: 350, battery: 4.1 })" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-bold rounded-xl border border-slate-700 transition-colors">
+              <i class="fa-solid fa-heart-pulse text-emerald-400 mr-1"></i> Отправить штатную телеметрию (Heartbeat OK)
+            </button>
+          </div>
+        </div>
+
+        <!-- Terminal Console -->
+        <div class="space-y-1.5 font-mono text-xs">
+          <div class="flex items-center justify-between text-[11px] text-slate-400">
+            <span>Лог отправки пакетов телеметрии контроллера STM32:</span>
+            <button type="button" onclick="app.clearEmulatorLog()" class="text-[10px] text-slate-500 hover:text-slate-300 underline">Очистить лог</button>
+          </div>
+          <div id="emu-terminal-log" class="bg-black/90 p-3 rounded-xl border border-slate-800 text-[11px] text-emerald-400 max-h-36 overflow-y-auto custom-scroll space-y-1">
+            <div class="text-slate-500">[STM32F401] Initialized: ADC1, I2C1 (MPU6050), USART2 (SIM800L AT)...</div>
+            <div class="text-slate-500">[SIM800L] Network Registered: 25001 (MTS RUS), GPRS Attached...</div>
+            <div class="text-slate-400">[STANDBY] Готов к передаче пакетов на сервер: /api/telemetry</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+        <button type="button" onclick="app.switchView('dispatcher'); app.closeEmulatorModal();" class="text-xs text-indigo-400 hover:text-indigo-300 font-bold flex items-center space-x-1.5">
+          <i class="fa-solid fa-table-columns"></i>
+          <span>Перейти на Канбан-доску диспетчера</span>
+        </button>
+        <button type="button" onclick="app.closeEmulatorModal()" class="px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 rounded-xl">Закрыть стенд</button>
       </div>
     </div>
   </div>

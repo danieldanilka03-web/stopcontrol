@@ -6,6 +6,54 @@ import seed from './_seed.js';
 export const sql = neon(process.env.DATABASE_URL);
 const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 
+export const DEFAULT_DEVICES = [
+  {
+    id: "dev-stm32-01",
+    name: "Контроллер павильона Сенная (STM32F4)",
+    stopId: "stop-vn-1",
+    stopName: "Кремлёвский парк / Сенная площадь",
+    city: "Великий Новгород",
+    apiKey: "dkey_vn_sennaya_77a9b1c2",
+    status: "online",
+    installedDate: "2024-03-15",
+    sensors: ["Освещение (люксометр)", "Удар / вибрация (акселерометр)", "Контроль табло (RS-485)", "Датчик двери шкафа"],
+    firmware: "STM32-StopMon v1.4.2",
+    lastSeen: "2026-10-30 23:30",
+    lastEvent: "ping",
+    lastDetails: "Штатный опрос датчиков, напряжение 4.1В"
+  },
+  {
+    id: "dev-stm32-02",
+    name: "Контроллер Вокзальная пл. (STM32F1)",
+    stopId: "stop-vn-2",
+    stopName: "Вокзальная площадь (Ж/Д Вокзал)",
+    city: "Великий Новгород",
+    apiKey: "dkey_vn_vokzal_92f4c3d8",
+    status: "alarm",
+    installedDate: "2023-11-20",
+    sensors: ["Освещение (люксометр)", "Удар / вибрация", "Контроль расписания"],
+    firmware: "STM32-StopMon v1.3.0",
+    lastSeen: "2026-10-30 23:25",
+    lastEvent: "light_failure",
+    lastDetails: "Обрыв линии светодиодной подсветки расписания"
+  },
+  {
+    id: "dev-stm32-03",
+    name: "Контроллер Завод Волна (STM32F4)",
+    stopId: "stop-vn-3",
+    stopName: "Ул. Большая Санкт-Петербургская / Завод Волна",
+    city: "Великий Новгород",
+    apiKey: "dkey_vn_volna_33e1d5a7",
+    status: "alarm",
+    installedDate: "2024-01-10",
+    sensors: ["Акустический датчик разбития", "Акселерометр MPU6050", "Освещение"],
+    firmware: "STM32-StopMon v1.4.2",
+    lastSeen: "2026-10-30 23:10",
+    lastEvent: "impact",
+    lastDetails: "Зафиксирован сильный механический удар 4.8g"
+  }
+];
+
 let ready;
 export function init() {
   return (ready ||= (async () => {
@@ -26,6 +74,10 @@ export function init() {
       for (const k of ['stops', 'tickets', 'inspections']) {
         await sql`INSERT INTO collections (key,data) VALUES (${k}, ${JSON.stringify(seed[k])}::jsonb) ON CONFLICT DO NOTHING`;
       }
+    }
+    const [devCheck] = await sql`SELECT 1 FROM collections WHERE key='devices'`;
+    if (!devCheck) {
+      await sql`INSERT INTO collections (key,data) VALUES ('devices', ${JSON.stringify(DEFAULT_DEVICES)}::jsonb) ON CONFLICT DO NOTHING`;
     }
   })().catch(e => { ready = null; throw e; }));
 }
