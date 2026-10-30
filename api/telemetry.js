@@ -78,6 +78,7 @@ export default async function handler(req, res) {
     device.lastEvent = eventType;
     device.lastDetails = details || eventMeta.label;
 
+    let updatedStops = stops;
     let newTicket = null;
     if (isAlarm) {
       const ticketId = 'TICK-IoT-' + Math.floor(1000 + Math.random() * 9000);
@@ -102,28 +103,24 @@ export default async function handler(req, res) {
       };
 
       tickets.unshift(newTicket);
+      updatedStops = stops.map(s => s.id === stop.id ? { ...s, status: 'danger' } : s);
 
-      const updatedStops = stops.map(s => s.id === stop.id ? { ...s, status: 'danger' } : s);
-      await sql`INSERT INTO collections (key, data, updated_at) VALUES ('stops', ${JSON.stringify(updatedStops)}::jsonb, now())
-        ON CONFLICT (key) DO UPDATE SET data=EXCLUDED.data, updated_at=now()`;
-
-      const users = await sql`SELECT id FROM users WHERE role IN ('admin', 'dispatcher')`;
-      for (const u of users) {
-        notifications.push({
-          id: 'n_iot_' + Date.now() + Math.random().toString(36).slice(2, 6),
-          userId: u.id,
-          ticketId: newTicket.id,
-          text: `🚨 Аварийный сигнал с датчика (${device.name}): ${eventMeta.label} на ${stop.name}! Создана заявка ${newTicket.id}.`,
-          at: nowStr(),
-          read: false
-        });
+      try {
+        const users = await sql`SELECT id FROM users WHERE role IN ('admin', 'dispatcher')`;
+        for (const u of (users || [])) {
+          notifications.push({
+            id: 'n_iot_' + Date.now() + Math.random().toString(36).slice(2, 6),
+            userId: u.id,
+            ticketId: newTicket.id,
+            text: `🚨 Аварийный сигнал с датчика (${device.name}): ${eventMeta.label} на ${stop.name}! Создана заявка ${newTicket.id}.`,
+            at: nowStr(),
+            read: false
+          });
+        }
+        notifications = notifications.slice(-200);
+      } catch (e) {
+        console.warn('Ошибка при создании уведомлений пользователей:', e.message);
       }
-      notifications = notifications.slice(-200);
-
-      await sql`INSERT INTO collections (key, data, updated_at) VALUES
-        ('tickets', ${JSON.stringify(tickets)}::jsonb, now()),
-        ('notifications', ${JSON.stringify(notifications)}::jsonb, now())
-        ON CONFLICT (key) DO UPDATE SET data=EXCLUDED.data, updated_at=now()`;
     }
 
     const logEntry = {
@@ -144,10 +141,20 @@ export default async function handler(req, res) {
     telemetryLogs.push(logEntry);
     telemetryLogs = telemetryLogs.slice(-100);
 
-    await sql`INSERT INTO collections (key, data, updated_at) VALUES
-      ('devices', ${JSON.stringify(devices)}::jsonb, now()),
-      ('telemetry_logs', ${JSON.stringify(telemetryLogs)}::jsonb, now())
-      ON CONFLICT (key) DO UPDATE SET data=EXCLUDED.data, updated_at=now()`;
+    const writes = [
+      sql`INSERT INTO collections (key, data, updated_at) VALUES ('devices', ${JSON.stringify(devices)}::jsonb, now()) ON CONFLICT (key) DO UPDATE SET data=EXCLUDED.data, updated_at=now()`,
+      sql`INSERT INTO collections (key, data, updated_at) VALUES ('telemetry_logs', ${JSON.stringify(telemetryLogs)}::jsonb, now()) ON CONFLICT (key) DO UPDATE SET data=EXCLUDED.data, updated_at=now()`
+    ];
+
+    if (isAlarm) {
+      writes.push(sql`INSERT INTO collections (key, data, updated_at) VALUES ('stops', ${JSON.stringify(updatedStops)}::jsonb, now()) ON CONFLICT (key) DO UPDATE SET data=EXCLUDED.data, updated_at=now()`);
+      writes.push(sql`INSERT INTO collections (key, data, updated_at) VALUES ('tickets', ${JSON.stringify(tickets)}::jsonb, now()) ON CONFLICT (key) DO UPDATE SET data=EXCLUDED.data, updated_at=now()`);
+      if (notifications.length) {
+        writes.push(sql`INSERT INTO collections (key, data, updated_at) VALUES ('notifications', ${JSON.stringify(notifications)}::jsonb, now()) ON CONFLICT (key) DO UPDATE SET data=EXCLUDED.data, updated_at=now()`);
+      }
+    }
+
+    await Promise.all(writes);
 
     return send(res, 200, {
       ok: true,

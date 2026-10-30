@@ -3,7 +3,9 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import seed from './_seed.js';
 
-export const sql = neon(process.env.DATABASE_URL);
+const rawDbUrl = process.env.DATABASE_URL || '';
+const cleanDbUrl = rawDbUrl.replace('-pooler', '').replace(/([?&])channel_binding=[^&]+(&|$)/, '$1').replace(/[?&]$/, '');
+export const sql = neon(cleanDbUrl);
 const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 
 export const DEFAULT_DEVICES = [
