@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full bg-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ИС Мониторинга городских остановочных комплексов РФ</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="h-full flex flex-col text-slate-800 antialiased overflow-hidden">
+
+  <!-- ==================== AUTHENTICATION & REGISTRATION SCREEN ==================== -->
+  <div id="auth-screen" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto hidden">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-xl w-full p-6 sm:p-8 border border-slate-200 my-auto">
+      <div class="text-center mb-6">
+        <div class="w-14 h-14 bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-indigo-200">
+          <i class="fa-solid fa-bus-simple text-2xl"></i>
+        </div>
+        <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Городской ТранзитКонтроль</h1>
+        <p class="text-xs text-slate-500 mt-1">Информационная система мониторинга остановочных комплексов городов РФ</p>
+      </div>
+
+      <div class="flex border-b border-slate-200 mb-6">
+        <button id="tab-btn-login" onclick="app.setAuthTab('login')" class="flex-1 pb-3 text-xs sm:text-sm font-bold border-b-2 border-indigo-600 text-indigo-600 transition-colors">
+          <i class="fa-solid fa-right-to-bracket mr-1.5"></i> Вход в систему
+        </button>
+        <button id="tab-btn-register" onclick="app.setAuthTab('register')" class="flex-1 pb-3 text-xs sm:text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition-colors">
+          <i class="fa-solid fa-user-plus mr-1.5"></i> Регистрация горожанина
+        </button>
+      </div>
+
+      <div id="auth-form-login" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Email / Рабочий логин</label>
+          <div class="relative">
+            <i class="fa-solid fa-envelope absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+            <input type="text" id="login-email" placeholder="name@example.ru" autocomplete="username" class="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 text-xs outline-none bg-slate-50 focus:bg-white">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Пароль учетной записи</label>
+          <div class="relative">
+            <i class="fa-solid fa-lock absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+            <input type="password" id="login-password" placeholder="Пароль" autocomplete="current-password" class="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 text-xs outline-none bg-slate-50 focus:bg-white">
+          </div>
+        </div>
+
+        <button onclick="app.loginWithCredentials()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition-all shadow-md shadow-indigo-200 flex items-center justify-center space-x-2">
+          <i class="fa-solid fa-arrow-right-to-bracket"></i>
+          <span>Войти в личный кабинет</span>
+        </button>
+
+        <div class="pt-4 border-t border-slate-100">
+          <div class="flex items-center justify-between mb-2.5">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Демо-аккаунты (вход в 1 клик):</span>
+            <span class="text-[10px] text-indigo-600 font-semibold">Фиксированная роль</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 text-left">
+            <button onclick="app.demoLogin('admin')" class="flex items-center gap-2.5 p-2.5 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100/80 transition-all text-xs text-rose-950 group">
+              <span class="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center shrink-0 font-bold shadow-sm"><i class="fa-solid fa-shield-halved"></i></span>
+              <div class="min-w-0">
+                <div class="font-bold truncate text-[11px] group-hover:text-rose-700">Администратор</div>
+                <div class="text-[10px] text-rose-700 truncate">Алексеев М. С.</div>
+              </div>
+            </button>
+
+            <button onclick="app.demoLogin('dispatcher')" class="flex items-center gap-2.5 p-2.5 rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100/80 transition-all text-xs text-amber-950 group">
+              <span class="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 font-bold shadow-sm"><i class="fa-solid fa-headset"></i></span>
+              <div class="min-w-0">
+                <div class="font-bold truncate text-[11px] group-hover:text-amber-700">Диспетчер ЦДС</div>
+                <div class="text-[10px] text-amber-700 truncate">Ковалева Е. Н.</div>
+              </div>
+            </button>
+
+            <button onclick="app.demoLogin('inspector')" class="flex items-center gap-2.5 p-2.5 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100/80 transition-all text-xs text-blue-950 group">
+              <span class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 font-bold shadow-sm"><i class="fa-solid fa-clipboard-check"></i></span>
+              <div class="min-w-0">
+                <div class="font-bold truncate text-[11px] group-hover:text-blue-700">Инспектор</div>
+                <div class="text-[10px] text-blue-700 truncate">Смирнов А. В.</div>
+              </div>
+            </button>
+
+            <button onclick="app.demoLogin('citizen')" class="flex items-center gap-2.5 p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/80 transition-all text-xs text-emerald-950 group">
+              <span class="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 font-bold shadow-sm"><i class="fa-solid fa-user"></i></span>
+              <div class="min-w-0">
+                <div class="font-bold truncate text-[11px] group-hover:text-emerald-700">Житель города</div>
+                <div class="text-[10px] text-emerald-700 truncate">Иванов С. П.</div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <form id="auth-form-register" onsubmit="app.registerCitizen(event)" class="space-y-3 hidden text-xs">
+        <div class="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] text-emerald-800 leading-snug">
+          <i class="fa-solid fa-database mr-1 text-emerald-600"></i>
+          Подключена полная база всех 89+ региональных столиц и городов РФ: начните вводить любой город (Великий Новгород, Тверь, Псков...).
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Фамилия, Имя, Отчество <span class="text-rose-500">*</span></label>
+          <input type="text" id="reg-name" required placeholder="Например: Петров Иван Сергеевич" class="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Номер телефона <span class="text-rose-500">*</span></label>
+            <input type="tel" id="reg-phone" required placeholder="+7 (9XX) XXX-XX-XX" class="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Электронная почта <span class="text-rose-500">*</span></label>
+            <input type="email" id="reg-email" required placeholder="user@domain.ru" class="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div class="relative">
+            <label class="block font-bold text-slate-700 mb-1">
+              <i class="fa-solid fa-city text-indigo-500 mr-1"></i> Город в РФ <span class="text-rose-500">*</span>
+            </label>
+            <div class="relative">
+              <input type="text" id="reg-city-search" required autocomplete="off" placeholder="Введите город (напр. Великий Новгород)" class="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none bg-white font-semibold pr-7">
+            </div>
+            <div id="reg-city-results" class="autocomplete-dropdown absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl hidden custom-scroll"></div>
+            <input type="hidden" id="reg-city-val" value="Великий Новгород">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">
+              <i class="fa-solid fa-map-pin text-indigo-500 mr-1"></i> Район проживания <span class="text-rose-500">*</span>
+            </label>
+            <input type="text" id="reg-district" required placeholder="Напр. Софийская сторона" value="Софийская сторона" class="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none bg-white font-medium">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Пароль <span class="text-rose-500">*</span></label>
+            <input type="password" id="reg-pass" required placeholder="Минимум 6 знаков" minlength="6" class="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Повтор пароля <span class="text-rose-500">*</span></label>
+            <input type="password" id="reg-pass-repeat" required placeholder="Повторите пароль" class="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50">
+          </div>
+        </div>
+
+        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs transition-all shadow-md shadow-emerald-200 flex items-center justify-center space-x-2 mt-2">
+          <i class="fa-solid fa-user-check"></i>
+          <span>Зарегистрироваться и войти</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== APPLICATION SHELL ==================== -->
+  <div id="app-shell" class="h-full flex flex-col overflow-hidden">
+
+    <header class="bg-white border-b border-slate-200 shrink-0 z-30 shadow-sm">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+
+        <div class="flex items-center space-x-3 cursor-pointer" onclick="app.switchView('map')">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white flex items-center justify-center font-bold shadow-md shadow-indigo-100">
+            <i class="fa-solid fa-bus-simple text-base"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h1 class="text-sm sm:text-base font-bold text-slate-900 leading-tight">ТранзитКонтроль</h1>
+              <span class="text-[9px] uppercase font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">ИС Мониторинг РФ</span>
+            </div>
+            <p class="text-[11px] text-slate-500 hidden sm:block">Единый мониторинг остановочных комплексов городов РФ</p>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+          <div class="flex items-center space-x-2.5 pl-2.5 pr-3.5 py-1.5 rounded-2xl bg-slate-50 border border-slate-200">
+            <div id="header-avatar" class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white flex items-center justify-center font-bold text-xs shadow-inner">
+              АМ
+            </div>
+            <div class="text-left hidden sm:block">
+              <div id="header-user-name" class="text-xs font-bold text-slate-800 leading-tight">Алексеев М. С.</div>
+              <div id="header-user-location" class="text-[10px] text-slate-500 font-medium">Великий Новгород • Все районы</div>
+            </div>
+            <span id="header-user-badge" class="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+              Администратор
+            </span>
+          </div>
+
+          <button onclick="app.logout()" title="Выйти из текущей учетной записи" class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 text-xs font-semibold transition-colors flex items-center space-x-1.5 shadow-sm">
+            <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
+            <span class="hidden md:inline">Выйти</span>
+          </button>
+        </div>
+      </div>
+
+      <nav class="border-t border-slate-100 bg-slate-50/50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 overflow-x-auto custom-scroll py-1" id="role-nav-tabs"></div>
+      </nav>
+    </header>
+
+    <main class="flex-1 relative overflow-hidden bg-slate-100">
+
+      <!-- ================= VIEW 1: INTERACTIVE MAP ================= -->
+      <section id="view-map" class="tab-view w-full h-full flex flex-col overflow-hidden p-3 sm:p-5 space-y-3">
+
+        <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+          <div class="flex flex-wrap items-center gap-2.5 text-xs flex-1">
+
+            <div class="relative w-80">
+              <span class="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">
+                <i class="fa-solid fa-magnifying-glass-location text-indigo-500 mr-1"></i> Поиск любого города / района РФ:
+              </span>
+              <div class="relative">
+                <input type="text" id="map-city-search" autocomplete="off" placeholder="Введите город РФ (Великий Новгород, Псков, Тверь...)" class="w-full pl-8 pr-8 py-1.5 text-xs rounded-xl border border-slate-300 font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50 focus:bg-white shadow-inner">
+                <i class="fa-solid fa-city absolute left-2.5 top-2.5 text-slate-400 text-xs"></i>
+              </div>
+              <div id="map-city-results" class="autocomplete-dropdown absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl hidden custom-scroll"></div>
+            </div>
+
+            <div>
+              <span class="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">Быстрый переход по городам РФ:</span>
+              <select id="map-quick-cities" onchange="app.handleQuickCityChange()" class="bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none max-w-[210px]"></select>
+            </div>
+
+            <div>
+              <span class="text-[10px] font-bold uppercase text-slate-400 block mb-0.5">Состояние:</span>
+              <select id="map-filter-status" onchange="app.renderMapMarkers()" class="bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 outline-none">
+                <option value="all">Все состояния</option>
+                <option value="good">🟢 Исправно</option>
+                <option value="warning">🟡 Внимание</option>
+                <option value="danger">🔴 Аварийно</option>
+              </select>
+            </div>
+
+            <div class="self-end pb-1">
+              <button onclick="app.resetMapFilters()" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold px-2 py-1 rounded-lg hover:bg-indigo-50 transition-colors">
+                <i class="fa-solid fa-rotate-left mr-1"></i>Сбросить
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 text-xs text-slate-600 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+            <span class="font-bold text-slate-700">Светофор:</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm"></span> Исправно</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm"></span> Внимание</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 pulse-danger-marker shadow-sm"></span> Аварийно</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3.5 flex-1 min-h-0">
+
+          <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 p-2 overflow-hidden h-full relative isolate">
+            <div id="city-map" class="w-full h-full rounded-xl z-0"></div>
+
+            <div class="absolute top-4 left-4 z-[400] bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-slate-200 shadow-md text-xs flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span class="text-slate-400 font-medium">Активный город:</span>
+              <strong id="map-active-city-badge" class="text-slate-800">Великий Новгород</strong>
+              <span id="map-active-city-count" class="text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded text-[10px]">(3 ост.)</span>
+            </div>
+          </div>
+
+          <div id="stop-details-card" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 flex flex-col h-full overflow-y-auto custom-scroll">
+            <div class="text-center py-24 text-slate-400">
+              <i class="fa-solid fa-map-location-dot text-4xl mb-3 text-slate-300"></i>
+              <p class="text-xs font-semibold">Выберите остановку на карте для просмотра детального паспорта</p>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ================= VIEW 2: REGISTRY (ADMIN) ================= -->
+      <section id="view-registry" class="tab-view hidden w-full h-full overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-4 custom-scroll">
+        <div class="max-w-7xl mx-auto space-y-4">
+
+          <div class="flex flex-wrap items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div>
+              <h2 class="text-lg font-bold text-slate-900">Реестр остановочных комплексов РФ</h2>
+              <p class="text-xs text-slate-500">Учет адресов, координат, оборудования и паспортов по всем городам России</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="app.exportStopsToCSV()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 border border-slate-300">
+                <i class="fa-solid fa-file-csv text-emerald-600"></i>
+                <span>Экспорт в CSV</span>
+              </button>
+              <button onclick="app.openStopModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-200 transition-colors flex items-center gap-1.5">
+                <i class="fa-solid fa-plus"></i>
+                <span>Добавить комплекс</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-50 text-slate-700 uppercase font-bold border-b border-slate-200 tracking-wider">
+                  <tr>
+                    <th class="p-3.5">ID / Название</th>
+                    <th class="p-3.5">Город / Район</th>
+                    <th class="p-3.5">Маршруты</th>
+                    <th class="p-3.5">Оборудование</th>
+                    <th class="p-3.5">Состояние</th>
+                    <th class="p-3.5 text-right">Действия</th>
+                  </tr>
+                </thead>
+                <tbody id="registry-table-body" class="divide-y divide-slate-100 font-medium"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ================= VIEW 3: DISPATCHER KANBAN ================= -->
+      <section id="view-dispatcher" class="tab-view hidden w-full h-full overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-4 custom-scroll">
+        <div class="max-w-7xl mx-auto space-y-4">
+
+          <div class="flex flex-wrap items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="text-xs uppercase tracking-wider text-amber-600 font-bold">Диспетчерский центр</span>
+                <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-xs font-semibold">Контроль SLA</span>
+              </div>
+              <h2 class="text-lg font-bold text-slate-900 mt-0.5">Канбан-доска заявок на ремонт и устранение аварий</h2>
+              <p class="text-xs text-slate-500">Распределение бригад, нормативные сроки (SLA) и фиксация устранения дефектов</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs bg-indigo-50 text-indigo-700 font-bold px-3 py-1.5 rounded-xl border border-indigo-100">
+                Активных дефектов: <strong id="dispatcher-active-count">0</strong>
+              </span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+
+            <div class="bg-slate-200/60 p-3.5 rounded-2xl flex flex-col border border-slate-200 min-h-[460px]">
+              <div class="flex items-center justify-between pb-2.5 border-b border-slate-300/70 mb-3">
+                <span class="text-xs font-bold text-slate-700 uppercase tracking-wide flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Новые сигналы
+                </span>
+                <span id="col-count-new" class="text-xs font-bold bg-white text-slate-700 px-2 py-0.5 rounded-full shadow-sm">0</span>
+              </div>
+              <div id="kanban-col-new" class="space-y-3 flex-1 overflow-y-auto custom-scroll pr-1"></div>
+            </div>
+
+            <div class="bg-amber-100/40 p-3.5 rounded-2xl flex flex-col border border-amber-200 min-h-[460px]">
+              <div class="flex items-center justify-between pb-2.5 border-b border-amber-200 mb-3">
+                <span class="text-xs font-bold text-amber-900 uppercase tracking-wide flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> В работе
+                </span>
+                <span id="col-count-in_progress" class="text-xs font-bold bg-white text-amber-800 px-2 py-0.5 rounded-full shadow-sm">0</span>
+              </div>
+              <div id="kanban-col-in_progress" class="space-y-3 flex-1 overflow-y-auto custom-scroll pr-1"></div>
+            </div>
+
+            <div class="bg-purple-100/40 p-3.5 rounded-2xl flex flex-col border border-purple-200 min-h-[460px]">
+              <div class="flex items-center justify-between pb-2.5 border-b border-purple-200 mb-3">
+                <span class="text-xs font-bold text-purple-900 uppercase tracking-wide flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span> На приемке
+                </span>
+                <span id="col-count-review" class="text-xs font-bold bg-white text-purple-800 px-2 py-0.5 rounded-full shadow-sm">0</span>
+              </div>
+              <div id="kanban-col-review" class="space-y-3 flex-1 overflow-y-auto custom-scroll pr-1"></div>
+            </div>
+
+            <div class="bg-emerald-100/40 p-3.5 rounded-2xl flex flex-col border border-emerald-200 min-h-[460px]">
+              <div class="flex items-center justify-between pb-2.5 border-b border-emerald-200 mb-3">
+                <span class="text-xs font-bold text-emerald-900 uppercase tracking-wide flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Устранено
+                </span>
+                <span id="col-count-done" class="text-xs font-bold bg-white text-emerald-800 px-2 py-0.5 rounded-full shadow-sm">0</span>
+              </div>
+              <div id="kanban-col-done" class="space-y-3 flex-1 overflow-y-auto custom-scroll pr-1"></div>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ================= VIEW 4: INSPECTOR CHECKLIST ================= -->
+      <section id="view-inspector" class="tab-view hidden w-full h-full overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-4 custom-scroll">
+        <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+            <h3 class="text-sm font-bold text-slate-900 mb-1 flex items-center justify-between">
+              <span>График плановых осмотров</span>
+              <span class="text-[11px] font-normal text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">План на смену</span>
+            </h3>
+            <p class="text-xs text-slate-400 mb-4">Выберите объект для заполнения электронного акта</p>
+            <div id="inspector-scheduled-stops" class="space-y-2 flex-1 overflow-y-auto custom-scroll"></div>
+          </div>
+
+          <div class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div>
+                <h2 class="text-base font-bold text-slate-900">Чек-лист технического состояния оборудования</h2>
+                <p id="checklist-stop-title" class="text-xs text-indigo-600 font-semibold mt-0.5">Выберите комплекс из графика слева</p>
+              </div>
+              <span class="px-3 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded-xl border border-blue-100">Акт № ИНСП-2026</span>
+            </div>
+
+            <form id="inspection-form" onsubmit="app.submitInspection(event)" class="space-y-4">
+              <input type="hidden" id="insp-stop-id" value="">
+
+              <div class="space-y-2.5" id="checklist-elements"></div>
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Заключение инспектора / описание дефектов</label>
+                <textarea id="insp-notes" rows="2" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 focus:bg-white" placeholder="Укажите подробности повреждений, угрозу для пассажиров..."></textarea>
+              </div>
+
+              <div>
+                <label for="insp-photo" class="block border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-2xl p-4 text-center cursor-pointer transition-colors bg-slate-50/50">
+                  <i class="fa-solid fa-camera-retro text-slate-400 text-2xl mb-1"></i>
+                  <p class="font-bold text-blue-700 text-xs">Прикрепить фотофиксацию дефекта</p>
+                  <p class="text-[10px] text-slate-400 mt-0.5">JPG / PNG — снимок сохранится в акте осмотра</p>
+                </label>
+                <input type="file" id="insp-photo" accept="image/*" class="hidden" onchange="app.handleInspPhotoUpload(event)">
+                <div id="insp-photo-preview" class="hidden mt-2"></div>
+              </div>
+
+              <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+                <span class="text-xs text-slate-400">При критических дефектах наряд автоматически поступит диспетчеру</span>
+                <button type="submit" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md shadow-blue-200 transition-colors flex items-center space-x-2">
+                  <i class="fa-solid fa-file-signature"></i>
+                  <span>Сформировать и подписать акт</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ================= VIEW 5: CITIZEN REPORT ================= -->
+      <section id="view-citizen-report" class="tab-view hidden w-full h-full overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scroll">
+        <div class="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+
+          <div class="text-center">
+            <div class="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center mx-auto mb-2 text-xl shadow-sm">
+              <i class="fa-solid fa-bullhorn"></i>
+            </div>
+            <h2 class="text-xl font-bold text-slate-900">Сообщить о неисправности на остановке</h2>
+            <p class="text-xs text-slate-500 mt-1">Сигнал поступит напрямую в единую диспетчерскую службу ремонта</p>
+          </div>
+
+          <form onsubmit="app.submitCitizenReport(event)" class="space-y-4 text-xs">
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">
+                  <i class="fa-solid fa-city text-emerald-600 mr-1"></i> Город <span class="text-rose-500">*</span>
+                </label>
+                <input type="text" id="report-city-display" readonly class="w-full px-3 py-2 rounded-xl border border-slate-300 font-semibold bg-slate-50 text-slate-700 outline-none">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">
+                  <i class="fa-solid fa-bus text-emerald-600 mr-1"></i> Остановочный пункт <span class="text-rose-500">*</span>
+                </label>
+                <select id="report-stop" required class="w-full px-3 py-2 rounded-xl border border-slate-300 font-medium focus:ring-2 focus:ring-emerald-500 outline-none bg-white"></select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Категория проблемы <span class="text-rose-500">*</span></label>
+              <select id="report-category" class="w-full px-3 py-2 rounded-xl border border-slate-300 font-medium focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+                <option value="Разбито стекло / остекление">Разбито стекло / остекление павильона</option>
+                <option value="Не работает освещение">Не горит освещение в темное время суток</option>
+                <option value="Поломка электронного табло">Электронное табло отключено / не работает</option>
+                <option value="Повреждена скамья / урна">Сломана урна или оторвана доска скамейки</option>
+                <option value="Вандализм / Граффити">Граффити, несанкционированная реклама, надписи</option>
+                <option value="Тактильная плитка / подходы">Разрушена тактильная плитка или ступени</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Подробное описание неисправности <span class="text-rose-500">*</span></label>
+              <textarea id="report-description" required rows="3" class="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50 focus:bg-white" placeholder="Опишите подробнее: где именно повреждение, представляет ли угрозу для пассажиров..."></textarea>
+            </div>
+
+            <div>
+              <label for="report-photo" class="block border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer transition-colors bg-slate-50/50">
+                <i class="fa-solid fa-camera text-slate-400 text-2xl mb-1"></i>
+                <p id="report-photo-label" class="font-bold text-emerald-700 text-xs">Прикрепить фото повреждения</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">JPG / PNG — снимок с привязкой геопозиции</p>
+              </label>
+              <input type="file" id="report-photo" accept="image/*" class="hidden" onchange="app.handleCitizenPhotoUpload(event)">
+              <div id="report-photo-preview" class="hidden mt-2"></div>
+            </div>
+
+            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-xs transition-colors shadow-md shadow-emerald-200 flex items-center justify-center space-x-2">
+              <i class="fa-solid fa-paper-plane"></i>
+              <span>Зарегистрировать обращение в диспетчерскую</span>
+            </button>
+          </form>
+
+        </div>
+      </section>
+
+      <!-- ================= VIEW 6: CITIZEN MY TICKETS ================= -->
+      <section id="view-citizen-tickets" class="tab-view hidden w-full h-full overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-4 custom-scroll">
+        <div class="max-w-4xl mx-auto space-y-4">
+
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+              <h2 class="text-base font-bold text-slate-900">Мои поданные обращения</h2>
+              <p class="text-xs text-slate-500">Отслеживание стадий выполнения ремонтных работ и сроков устранения (SLA)</p>
+            </div>
+            <button onclick="app.switchView('citizen-report')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors flex items-center space-x-1.5">
+              <i class="fa-solid fa-plus"></i>
+              <span>Новое обращение</span>
+            </button>
+          </div>
+
+          <div id="citizen-tickets-list" class="space-y-3"></div>
+
+        </div>
+      </section>
+
+      <!-- ================= VIEW 7: ANALYTICS & KPIS ================= -->
+      <section id="view-analytics" class="tab-view hidden w-full h-full overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 custom-scroll">
+        <div class="max-w-7xl mx-auto space-y-6">
+
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+              <div class="text-xs text-slate-400 font-medium">Всего остановок в сети</div>
+              <div id="kpi-total-stops" class="text-2xl font-black text-slate-900 mt-1">11</div>
+              <div class="text-[11px] text-emerald-600 mt-0.5"><i class="fa-solid fa-arrow-trend-up"></i> Все города РФ под контролем</div>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+              <div class="text-xs text-slate-400 font-medium">Исправность сети</div>
+              <div id="kpi-health-rate" class="text-2xl font-black text-emerald-600 mt-1">73%</div>
+              <div class="text-[11px] text-slate-400 mt-0.5">В нормативном состоянии</div>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+              <div class="text-xs text-slate-400 font-medium">Активные наряды</div>
+              <div id="kpi-active-tickets" class="text-2xl font-black text-amber-600 mt-1">5</div>
+              <div class="text-[11px] text-amber-600 mt-0.5">В процессе устранения</div>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+              <div class="text-xs text-slate-400 font-medium">Ср. время SLA</div>
+              <div class="text-2xl font-black text-indigo-600 mt-1">17.2 ч</div>
+              <div class="text-[11px] text-emerald-600 mt-0.5">Норматив до 24 ч соблюдён</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wide mb-3">Состояние остановочной инфраструктуры</h3>
+              <div class="h-64 flex items-center justify-center relative">
+                <canvas id="chart-statuses"></canvas>
+              </div>
+            </div>
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wide mb-3">Типичные категории дефектов</h3>
+              <div class="h-64 flex items-center justify-center relative">
+                <canvas id="chart-defect-types"></canvas>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ================= VIEW 8: USERS MANAGEMENT (ADMIN) ================= -->
+      <section id="view-users" class="tab-view hidden w-full h-full overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-4 custom-scroll">
+        <div class="max-w-7xl mx-auto space-y-4">
+
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+              <h2 class="text-base font-bold text-slate-900">Учетные записи и роли системы</h2>
+              <p class="text-xs text-slate-500">Административный контроль доступа сотрудников и зарегистрированных жителей по городам РФ</p>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-50 text-slate-700 uppercase font-bold border-b border-slate-200 tracking-wider">
+                  <tr>
+                    <th class="p-3.5">Пользователь</th>
+                    <th class="p-3.5">Email</th>
+                    <th class="p-3.5">Локация (Город / Район)</th>
+                    <th class="p-3.5">Назначенная роль</th>
+                    <th class="p-3.5">Статус</th>
+                  </tr>
+                </thead>
+                <tbody id="users-table-body" class="divide-y divide-slate-100 font-medium"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ================= Modal: Add / Edit Stop с выбором точки на мини-карте ================= -->
+  <div id="modal-stop" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-2xl w-full p-6 border border-slate-200 shadow-2xl my-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+        <div>
+          <h3 id="modal-stop-title" class="text-base font-bold text-slate-900">Добавить остановочный комплекс</h3>
+          <p id="modal-stop-subtitle" class="text-[11px] text-slate-500">Укажите объект на карте кликом или перетащите маркер</p>
+        </div>
+        <button onclick="app.closeStopModal()" class="text-slate-400 hover:text-slate-700 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div class="mb-4 p-3 bg-indigo-50/70 border border-indigo-200 rounded-2xl space-y-2">
+        <label class="block text-[11px] font-bold text-indigo-900">
+          <i class="fa-solid fa-wand-magic-sparkles mr-1 text-indigo-600"></i> Быстрый поиск адреса / города РФ:
+        </label>
+        <div class="flex gap-2">
+          <div class="relative flex-1">
+            <input type="text" id="modal-geocode-query" autocomplete="off" placeholder="Введите город или улицу (напр: Великий Новгород, ул. Газон)..." class="w-full px-3 py-2 text-xs rounded-xl border border-indigo-300 focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+            <div id="modal-geocode-results" class="autocomplete-dropdown absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl hidden custom-scroll"></div>
+          </div>
+          <button type="button" onclick="app.searchModalAddress()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shrink-0 transition-colors shadow-sm">
+            <i class="fa-solid fa-location-crosshairs mr-1"></i> Найти
+          </button>
+        </div>
+        <p class="text-[10px] text-indigo-700/80">Найденный объект автоматически центрируется на карте ниже.</p>
+      </div>
+
+      <form onsubmit="app.saveStop(event)" class="space-y-3 text-xs">
+        <input type="hidden" id="modal-stop-id" value="">
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block font-bold text-slate-700">
+              <i class="fa-solid fa-map-location-dot text-indigo-500 mr-1"></i>
+              Точка расположения на карте <span class="text-rose-500">*</span>
+            </label>
+            <span class="text-[10px] text-slate-400 font-medium">
+              <i class="fa-solid fa-hand-pointer mr-1"></i>Клик — поставить точку, перетащите маркер — уточнить
+            </span>
+          </div>
+          <div id="modal-stop-map" class="w-full h-56 rounded-xl border border-slate-300 bg-slate-100 overflow-hidden shadow-inner"></div>
+          <div class="grid grid-cols-2 gap-3 mt-2">
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-bold text-slate-500 uppercase w-8">Lat:</span>
+              <input type="text" id="modal-stop-lat" required value="58.522800" readonly class="w-full px-2.5 py-1.5 text-[11px] rounded-lg border border-slate-200 outline-none font-mono bg-slate-50 text-slate-700 cursor-not-allowed">
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] font-bold text-slate-500 uppercase w-8">Lng:</span>
+              <input type="text" id="modal-stop-lng" required value="31.269800" readonly class="w-full px-2.5 py-1.5 text-[11px] rounded-lg border border-slate-200 outline-none font-mono bg-slate-50 text-slate-700 cursor-not-allowed">
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Название остановки <span class="text-rose-500">*</span></label>
+          <input type="text" id="modal-stop-name" required placeholder="Например: Пл. Победы-Софийская" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Город РФ <span class="text-rose-500">*</span></label>
+            <input type="text" id="modal-stop-city" required placeholder="Город" value="Великий Новгород" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none bg-white font-semibold">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Район / Улица <span class="text-rose-500">*</span></label>
+            <input type="text" id="modal-stop-district" required placeholder="Район" value="Софийская сторона" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none bg-white font-medium">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Маршруты (через запятую) <span class="text-rose-500">*</span></label>
+          <input type="text" id="modal-stop-routes" required placeholder="Автобус 1, 4, 9, 101" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Исходное техническое состояние</label>
+          <select id="modal-stop-status" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none bg-white font-semibold">
+            <option value="good">🟢 Исправно</option>
+            <option value="warning">🟡 Требует внимания</option>
+            <option value="danger">🔴 Аварийное состояние</option>
+          </select>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="app.closeStopModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Отмена</button>
+          <button type="submit" id="modal-stop-submit" class="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md shadow-indigo-100">Сохранить комплекс</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Assign Contractor (Dispatcher) -->
+  <div id="modal-dispatch" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 border border-slate-200 shadow-2xl my-auto">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+        <h3 class="text-base font-bold text-slate-900 flex items-center space-x-2">
+          <i class="fa-solid fa-headset text-amber-600"></i>
+          <span>Назначение наряда подрядчику</span>
+        </h3>
+        <button onclick="app.closeDispatchModal()" class="text-slate-400 hover:text-slate-700 p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div class="space-y-3.5 text-xs">
+        <input type="hidden" id="dispatch-ticket-id">
+        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+          <div class="text-[10px] uppercase font-bold text-slate-400">Наряд:</div>
+          <div id="dispatch-ticket-title" class="text-xs font-bold text-slate-800 mt-0.5"></div>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Ответственная подрядная бригада <span class="text-rose-500">*</span></label>
+          <select id="dispatch-contractor" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-medium outline-none focus:ring-2 focus:ring-amber-500">
+            <option value="МУП «ГорСвет»">МУП «ГорСвет» (Электрооборудование, освещение, табло)</option>
+            <option value="ООО «РемТрансСервис»">ООО «РемТрансСервис» (Конструкции, остекление, павильон)</option>
+            <option value="МКУ «Чистый Город»">МКУ «Чистый Город» (Граффити, уборка, скамейки, урны)</option>
+            <option value="Бригада «ДорСтрой»">Бригада «ДорСтрой» (Тактильная плитка, подходы, бордюры)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 mb-1">Нормативный срок устранения (SLA) <span class="text-rose-500">*</span></label>
+          <select id="dispatch-sla" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white font-semibold outline-none focus:ring-2 focus:ring-amber-500">
+            <option value="6 часов (Экстренно)">6 часов (Экстренно - аварийная угроза)</option>
+            <option value="24 часа (Стандарт)">24 часа (Стандартный дефект)</option>
+            <option value="48 часов">48 часов (Плановые работы)</option>
+          </select>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+          <button type="button" onclick="app.closeDispatchModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Отмена</button>
+          <button type="button" onclick="app.confirmDispatch()" class="px-4 py-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow-md shadow-amber-200">Направить наряд</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Confirmation Dialog -->
+  <div id="modal-confirm" class="fixed inset-0 z-50 modal-backdrop hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 border border-slate-200 shadow-2xl text-center space-y-3">
+      <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto text-xl">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+      </div>
+      <h4 id="confirm-title" class="text-sm font-bold text-slate-900">Подтверждение операции</h4>
+      <p id="confirm-message" class="text-xs text-slate-500"></p>
+      <div class="flex items-center justify-center gap-2 pt-2">
+        <button id="confirm-cancel-btn" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Отмена</button>
+        <button id="confirm-ok-btn" class="px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-sm">Подтвердить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-box" class="fixed bottom-5 right-5 z-[9999] flex flex-col space-y-2 pointer-events-none"></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
