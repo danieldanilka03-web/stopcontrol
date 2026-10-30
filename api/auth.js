@@ -3,6 +3,19 @@ import { sql, init, sign, getUser, send, setCookie } from './_lib.js';
 
 const pub = u => ({ id: u.id, name: u.name, email: u.email, phone: u.phone, role: u.role, city: u.city, district: u.district, active: u.active });
 
+const attempts = new Map();
+function rateLimit(ip, maxAttempts = 15, windowMs = 60000) {
+  const now = Date.now();
+  const rec = attempts.get(ip) || { count: 0, reset: now + windowMs };
+  if (now > rec.reset) {
+    rec.count = 0;
+    rec.reset = now + windowMs;
+  }
+  rec.count++;
+  attempts.set(ip, rec);
+  return rec.count > maxAttempts;
+}
+
 export default async function handler(req, res) {
   try {
     await init();
@@ -14,8 +27,16 @@ export default async function handler(req, res) {
     if (req.method !== 'POST') return send(res, 405, { error: 'Метод не поддерживается' });
     const b = req.body || {};
     if (a === 'logout') { setCookie(res, '', 0); return send(res, 200, { ok: true }); }
+
+    const ip = String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'ip').split(',')[0].trim();
+    if (['login', 'register'].includes(a) && rateLimit(ip)) {
+      return send(res, 429, { error: 'Слишком много попыток. Пожалуйста, подождите минуту.' });
+    }
+
     const email = String(b.email || '').trim().toLowerCase();
     const password = String(b.password || '');
+    if (password.length > 72) return send(res, 400, { error: 'Пароль слишком длинный (максимум 72 символа)' });
+
     if (a === 'login') {
       const [u] = await sql`SELECT * FROM users WHERE email=${email}`;
       if (!u || !u.active || !bcrypt.compareSync(password, u.password_hash)) return send(res, 401, { error: 'Неверный email или пароль' });

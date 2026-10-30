@@ -22,7 +22,32 @@
         this.modalMarker = null;
       }
 
-      load(key, fallback) { return JSON.parse(JSON.stringify(fallback)); }
+      load(key, fallback) {
+        try {
+          const stored = localStorage.getItem(key);
+          if (stored) return JSON.parse(stored);
+        } catch (e) {}
+        return JSON.parse(JSON.stringify(fallback));
+      }
+
+      esc(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      safePhoto(url) {
+        if (!url || typeof url !== 'string') return null;
+        const clean = url.trim();
+        if (clean.startsWith('data:image/') || clean.startsWith('https://') || clean.startsWith('http://')) {
+          return clean.replace(/"/g, '%22');
+        }
+        return null;
+      }
 
       async api(path, opts = {}) {
         const r = await fetch('/api/' + path, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, ...opts, body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined });
@@ -32,8 +57,16 @@
       }
 
       async loadData() {
-        const d = await this.api('data');
-        this.notifications = d.notifications || []; this.users = d.users; this.stops = d.stops; this.tickets = d.tickets; this.inspections = d.inspections;
+        try {
+          const d = await this.api('data');
+          this.notifications = d.notifications || [];
+          this.users = d.users || this.users;
+          this.stops = d.stops || this.stops;
+          this.tickets = d.tickets || this.tickets;
+          this.inspections = d.inspections || this.inspections;
+        } catch (err) {
+          console.warn('Сервер данных временно недоступен, работаем с локальными данными:', err);
+        }
       }
 
       async changeUser(id, patch) {
@@ -51,11 +84,12 @@
           if (document.hidden || !this.currentUser || this._dirty) return;
           if (document.querySelector('.modal-backdrop:not(.hidden), #auth-screen:not(.hidden)')) return;
           try { await this.loadData(); this.renderAllViews(); this.renderBell(); } catch (e) {}
-        }, 20000);
+        }, 60000);
       }
 
       persist(key, data) {
         const k = key.replace('tc_', '');
+        try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) {}
         if (!['stops', 'tickets', 'inspections'].includes(k)) return true;
         this._t = this._t || {};
         clearTimeout(this._t[k]);
@@ -78,7 +112,10 @@
           this.hideAuth();
           this.applyUserRoleUI();
           this.startSync();
-        } catch (e) { this.currentUser = null; this.showAuth(); }
+        } catch (e) {
+          this.currentUser = null;
+          this.showAuth();
+        }
       }
 
       populateQuickCities() {
@@ -622,26 +659,27 @@
         let bodyHtml = '';
 
         if (this.stopCardTab === 'passport') {
+          const photoUrl = this.safePhoto(stop.photo) || 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=600&auto=format&fit=crop&q=80';
           bodyHtml = `
             <div class="relative rounded-2xl overflow-hidden mb-3 border border-slate-200 shadow-sm">
-              <img src="${stop.photo}" alt="${stop.name}" class="w-full h-36 object-cover" onerror="this.style.display='none'">
+              <img src="${photoUrl}" alt="${this.esc(stop.name)}" class="w-full h-36 object-cover" onerror="this.style.display='none'">
               <div class="absolute top-2 right-2">${statusBadges[stop.status]}</div>
-              <div class="absolute bottom-2 left-2 bg-slate-900/85 text-white text-[10px] font-bold px-2 py-0.5 rounded backdrop-blur-sm">${stop.city} • ${stop.district}</div>
+              <div class="absolute bottom-2 left-2 bg-slate-900/85 text-white text-[10px] font-bold px-2 py-0.5 rounded backdrop-blur-sm">${this.esc(stop.city)} • ${this.esc(stop.district)}</div>
             </div>
-            <h3 class="text-base font-bold text-slate-900 leading-snug">${stop.name}</h3>
+            <h3 class="text-base font-bold text-slate-900 leading-snug">${this.esc(stop.name)}</h3>
             <p class="text-xs text-slate-500 mt-0.5"><i class="fa-solid fa-location-crosshairs text-indigo-500 mr-1"></i> Координаты: ${Number(stop.lat).toFixed(4)}, ${Number(stop.lng).toFixed(4)}</p>
-            ${stop.installedDate ? `<p class="text-[11px] text-slate-400 mt-0.5"><i class="fa-solid fa-calendar-check mr-1"></i> Дата установки: ${stop.installedDate}</p>` : ''}
+            ${stop.installedDate ? `<p class="text-[11px] text-slate-400 mt-0.5"><i class="fa-solid fa-calendar-check mr-1"></i> Дата установки: ${this.esc(stop.installedDate)}</p>` : ''}
             <div class="mt-3 py-2 border-y border-slate-100 text-xs">
               <div class="font-bold text-slate-700 mb-1">Маршруты городского транспорта:</div>
-              <div class="text-slate-600 font-medium">${stop.routes}</div>
+              <div class="text-slate-600 font-medium">${this.esc(stop.routes)}</div>
             </div>
             <div class="mt-3 text-xs">
               <div class="font-bold text-slate-700 mb-1.5">Установленное оборудование:</div>
-              <div class="flex flex-wrap gap-1">${(stop.equipment || []).map(e => `<span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-semibold"><i class="fa-solid fa-check text-emerald-600 mr-1"></i>${e}</span>`).join('')}</div>
+              <div class="flex flex-wrap gap-1">${(stop.equipment || []).map(e => `<span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-semibold"><i class="fa-solid fa-check text-emerald-600 mr-1"></i>${this.esc(e)}</span>`).join('')}</div>
             </div>
             <div class="mt-4 pt-3 border-t border-slate-100">
               <div class="flex items-center justify-between mb-2"><span class="text-xs font-bold text-slate-800">Активные наряды (${activeStopTickets.length})</span></div>
-              ${activeStopTickets.length === 0 ? '<p class="text-[11px] text-slate-400">Активных дефектов не зафиксировано</p>' : `<div class="space-y-1.5">${activeStopTickets.map(t => `<div class="p-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px]"><div class="font-bold text-slate-800">${t.category}</div><div class="text-[10px] text-slate-500 mt-0.5">SLA: ${t.sla} • Подрядчик: ${t.contractor}</div></div>`).join('')}</div>`}
+              ${activeStopTickets.length === 0 ? '<p class="text-[11px] text-slate-400">Активных дефектов не зафиксировано</p>' : `<div class="space-y-1.5">${activeStopTickets.map(t => `<div class="p-2 rounded-xl bg-slate-50 border border-slate-200 text-[11px]"><div class="font-bold text-slate-800">${this.esc(t.category)}</div><div class="text-[10px] text-slate-500 mt-0.5">SLA: ${this.esc(t.sla)} • Подрядчик: ${this.esc(t.contractor)}</div></div>`).join('')}</div>`}
             </div>
           `;
         } else if (this.stopCardTab === 'inspections') {
@@ -649,43 +687,49 @@
             bodyHtml = `<div class="text-center py-12 text-slate-400"><i class="fa-solid fa-clipboard-list text-3xl mb-2 text-slate-300"></i><p class="text-xs font-semibold">Актов осмотров по объекту пока нет</p></div>`;
           } else {
             const resBadge = (r) => r === 'danger' ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">Аварийно</span>' : (r === 'warning' ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Внимание</span>' : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">Норма</span>');
-            bodyHtml = inspections.map(i => `
+            bodyHtml = inspections.map(i => {
+              const photo = this.safePhoto(i.photo);
+              return `
               <div class="p-3 rounded-xl border border-slate-200 bg-white mb-2.5">
-                <div class="flex items-center justify-between"><span class="text-[11px] font-mono font-bold text-indigo-600">${i.id}</span>${resBadge(i.result)}</div>
-                <div class="text-xs font-bold text-slate-800 mt-1"><i class="fa-solid fa-user-shield text-slate-400 mr-1"></i>${i.inspector}</div>
-                <div class="text-[10px] text-slate-500 mt-0.5"><i class="fa-regular fa-clock mr-1"></i>${i.date}</div>
-                ${i.notes ? `<p class="text-[11px] text-slate-600 bg-slate-50 rounded-lg p-2 mt-2 border border-slate-100">${i.notes}</p>` : ''}
-                ${i.photo ? `<img src="${i.photo}" class="w-full h-28 object-cover rounded-lg mt-2 border border-slate-200" alt="Фото акта">` : ''}
+                <div class="flex items-center justify-between"><span class="text-[11px] font-mono font-bold text-indigo-600">${this.esc(i.id)}</span>${resBadge(i.result)}</div>
+                <div class="text-xs font-bold text-slate-800 mt-1"><i class="fa-solid fa-user-shield text-slate-400 mr-1"></i>${this.esc(i.inspector)}</div>
+                <div class="text-[10px] text-slate-500 mt-0.5"><i class="fa-regular fa-clock mr-1"></i>${this.esc(i.date)}</div>
+                ${i.notes ? `<p class="text-[11px] text-slate-600 bg-slate-50 rounded-lg p-2 mt-2 border border-slate-100">${this.esc(i.notes)}</p>` : ''}
+                ${photo ? `<img src="${photo}" class="w-full h-28 object-cover rounded-lg mt-2 border border-slate-200" alt="Фото акта">` : ''}
                 <details class="mt-2">
                   <summary class="text-[10px] font-bold text-indigo-600 cursor-pointer select-none">Показать 8 пунктов чек-листа</summary>
-                  <div class="mt-1.5 space-y-1">${(i.results || []).map(r => { const icon = r.value === 'ok' ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : (r.value === 'warning' ? '<i class="fa-solid fa-triangle-exclamation text-amber-500"></i>' : '<i class="fa-solid fa-circle-xmark text-rose-500"></i>'); return `<div class="flex items-center justify-between text-[10px] text-slate-600 px-1.5 py-1 rounded hover:bg-slate-50">${icon}<span class="flex-1 ml-1.5">${r.item}</span></div>`; }).join('')}</div>
+                  <div class="mt-1.5 space-y-1">${(i.results || []).map(r => { const icon = r.value === 'ok' ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>' : (r.value === 'warning' ? '<i class="fa-solid fa-triangle-exclamation text-amber-500"></i>' : '<i class="fa-solid fa-circle-xmark text-rose-500"></i>'); return `<div class="flex items-center justify-between text-[10px] text-slate-600 px-1.5 py-1 rounded hover:bg-slate-50">${icon}<span class="flex-1 ml-1.5">${this.esc(r.item)}</span></div>`; }).join('')}</div>
                 </details>
               </div>
-            `).join('');
+            `;
+            }).join('');
           }
         } else {
           if (allStopTickets.length === 0) {
             bodyHtml = `<div class="text-center py-12 text-slate-400"><i class="fa-solid fa-screwdriver-wrench text-3xl mb-2 text-slate-300"></i><p class="text-xs font-semibold">Нарядов по объекту не зарегистрировано</p></div>`;
           } else {
             const stBadge = { new: '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-800">Принята</span>', in_progress: '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">В работе</span>', review: '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800">На приемке</span>', done: '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">Выполнена</span>' };
-            bodyHtml = allStopTickets.map(t => `
+            bodyHtml = allStopTickets.map(t => {
+              const photo = this.safePhoto(t.photo);
+              return `
               <div class="p-3 rounded-xl border border-slate-200 bg-white mb-2.5">
-                <div class="flex items-center justify-between"><span class="text-[11px] font-mono font-bold text-indigo-600">${t.id}</span>${stBadge[t.status] || ''}</div>
-                <div class="text-xs font-bold text-slate-800 mt-1">${t.category}</div>
-                <p class="text-[11px] text-slate-600 bg-slate-50 rounded-lg p-2 mt-1.5 border border-slate-100">${t.description}</p>
-                ${t.photo ? `<img src="${t.photo}" class="w-full h-28 object-cover rounded-lg mt-2 border border-slate-200" alt="Фото дефекта">` : ''}
-                <div class="flex items-center justify-between text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-100"><span class="font-semibold text-slate-600">${t.contractor}</span><span>SLA: ${t.sla}</span></div>
+                <div class="flex items-center justify-between"><span class="text-[11px] font-mono font-bold text-indigo-600">${this.esc(t.id)}</span>${stBadge[t.status] || ''}</div>
+                <div class="text-xs font-bold text-slate-800 mt-1">${this.esc(t.category)}</div>
+                <p class="text-[11px] text-slate-600 bg-slate-50 rounded-lg p-2 mt-1.5 border border-slate-100">${this.esc(t.description)}</p>
+                ${photo ? `<img src="${photo}" class="w-full h-28 object-cover rounded-lg mt-2 border border-slate-200" alt="Фото дефекта">` : ''}
+                <div class="flex items-center justify-between text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-100"><span class="font-semibold text-slate-600">${this.esc(t.contractor)}</span><span>SLA: ${this.esc(t.sla)}</span></div>
               </div>
-            `).join('');
+            `;
+            }).join('');
           }
         }
 
         const actionHtml = `
           <div class="pt-4 border-t border-slate-100 mt-4 space-y-2">
-            ${this.currentUser.role === 'citizen' ? `<button onclick="app.reportFromStopCard('${stop.id}')" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-200 transition-colors flex items-center justify-center space-x-2"><i class="fa-solid fa-bullhorn"></i><span>Сообщить о поломке на этой остановке</span></button>` : (this.currentUser.role === 'inspector' ? `<button onclick="app.startInspectionFor('${stop.id}')" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-200 transition-colors flex items-center justify-center space-x-2"><i class="fa-solid fa-clipboard-check"></i><span>Провести осмотр комплекса</span></button>` : `
+            ${this.currentUser.role === 'citizen' ? `<button onclick="app.reportFromStopCard('${this.esc(stop.id)}')" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-200 transition-colors flex items-center justify-center space-x-2"><i class="fa-solid fa-bullhorn"></i><span>Сообщить о поломке на этой остановке</span></button>` : (this.currentUser.role === 'inspector' ? `<button onclick="app.startInspectionFor('${this.esc(stop.id)}')" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-200 transition-colors flex items-center justify-center space-x-2"><i class="fa-solid fa-clipboard-check"></i><span>Провести осмотр комплекса</span></button>` : `
               <div class="grid grid-cols-2 gap-2">
-                <button onclick="app.editStop('${stop.id}')" class="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-200 transition-colors flex items-center justify-center space-x-1.5"><i class="fa-solid fa-pen-to-square"></i><span>Редактировать</span></button>
-                <button onclick="app.openStopModal('${stop.city}')" class="py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold shadow-md transition-colors flex items-center justify-center space-x-1.5"><i class="fa-solid fa-plus"></i><span>Добавить</span></button>
+                <button onclick="app.editStop('${this.esc(stop.id)}')" class="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-indigo-200 transition-colors flex items-center justify-center space-x-1.5"><i class="fa-solid fa-pen-to-square"></i><span>Редактировать</span></button>
+                <button onclick="app.openStopModal('${this.esc(stop.city)}')" class="py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold shadow-md transition-colors flex items-center justify-center space-x-1.5"><i class="fa-solid fa-plus"></i><span>Добавить</span></button>
               </div>
             `)}
           </div>
@@ -757,16 +801,17 @@
 
           const card = document.createElement('div');
           card.className = "bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-2 hover:shadow-md transition-shadow";
+          const photoUrl = this.safePhoto(t.photo);
           card.innerHTML = `
-            <div class="flex items-center justify-between"><span class="text-[11px] font-mono font-bold text-indigo-600">${t.id}</span>${severityBadges[t.severity] || ''}</div>
-            <div class="font-bold text-xs text-slate-900 leading-snug">${t.stopName}</div>
-            <div class="text-[11px] text-slate-500 font-medium">${t.category} (${t.city}) ${this.isOverdue(t) ? '<span class="text-[10px] font-bold text-white bg-rose-600 px-1.5 py-0.5 rounded animate-pulse">Просрочено</span>' : ''}</div>${this.lastHist(t)}
-            <p class="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100">${t.description}</p>
-            ${t.photo ? `<img src="${t.photo}" class="w-full h-24 object-cover rounded-lg border border-slate-200" alt="Фото дефекта">` : ''}
-            <div class="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100"><span class="font-semibold text-slate-600">${t.contractor}</span><span>${(t.createdDate || '').split(' ')[0]}</span></div>
+            <div class="flex items-center justify-between"><span class="text-[11px] font-mono font-bold text-indigo-600">${this.esc(t.id)}</span>${severityBadges[t.severity] || ''}</div>
+            <div class="font-bold text-xs text-slate-900 leading-snug">${this.esc(t.stopName)}</div>
+            <div class="text-[11px] text-slate-500 font-medium">${this.esc(t.category)} (${this.esc(t.city)}) ${this.isOverdue(t) ? '<span class="text-[10px] font-bold text-white bg-rose-600 px-1.5 py-0.5 rounded animate-pulse">Просрочено</span>' : ''}</div>${this.lastHist(t)}
+            <p class="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100">${this.esc(t.description)}</p>
+            ${photoUrl ? `<img src="${photoUrl}" class="w-full h-24 object-cover rounded-lg border border-slate-200" alt="Фото дефекта">` : ''}
+            <div class="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100"><span class="font-semibold text-slate-600">${this.esc(t.contractor)}</span><span>${this.esc((t.createdDate || '').split(' ')[0])}</span></div>
             <div class="pt-2 flex flex-wrap items-center justify-end gap-1.5">
-              <button onclick="app.showOnMap('${t.stopId}')" class="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[10px] rounded-lg border border-indigo-200 transition-colors"><i class="fa-solid fa-map-location-dot mr-0.5"></i> На карте</button>
-              ${t.status === 'new' ? `<button onclick="app.openDispatchModal('${t.id}')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px] rounded-lg shadow-sm transition-colors">Назначить подрядчика</button>` : (t.status === 'in_progress' ? `<button onclick="app.setTicketStatus('${t.id}', 'review')" class="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] rounded-lg">На проверку</button>` : (t.status === 'review' ? `<button onclick="app.setTicketStatus('${t.id}', 'done')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg">Закрыть (устранено)</button>` : '<span class="text-[10px] text-emerald-600 font-bold"><i class="fa-solid fa-check mr-1"></i> Завершено</span>'))}
+              <button onclick="app.showOnMap('${this.esc(t.stopId)}')" class="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[10px] rounded-lg border border-indigo-200 transition-colors"><i class="fa-solid fa-map-location-dot mr-0.5"></i> На карте</button>
+              ${t.status === 'new' ? `<button onclick="app.openDispatchModal('${this.esc(t.id)}')" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[10px] rounded-lg shadow-sm transition-colors">Назначить подрядчика</button>` : (t.status === 'in_progress' ? `<button onclick="app.setTicketStatus('${this.esc(t.id)}', 'review')" class="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] rounded-lg">На проверку</button>` : (t.status === 'review' ? `<button onclick="app.setTicketStatus('${this.esc(t.id)}', 'done')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] rounded-lg">Закрыть (устранено)</button>` : '<span class="text-[10px] text-emerald-600 font-bold"><i class="fa-solid fa-check mr-1"></i> Завершено</span>'))}
             </div>
           `;
           colEl.appendChild(card);
@@ -835,7 +880,7 @@
 
       lastHist(t) {
         const h = (t.history || []).slice(-1)[0], L = { new: 'Новая', in_progress: 'В работе', review: 'На проверке', done: 'Выполнена' };
-        return h ? `<div class="text-[10px] text-slate-400"><i class="fa-solid fa-clock-rotate-left"></i> ${h.by}: ${L[h.to] || h.to} · ${h.at}</div>` : '';
+        return h ? `<div class="text-[10px] text-slate-400"><i class="fa-solid fa-clock-rotate-left"></i> ${this.esc(h.by)}: ${this.esc(L[h.to] || h.to)} · ${this.esc(h.at)}</div>` : '';
       }
 
       renderBell() {
@@ -846,7 +891,7 @@
         const list = (this.notifications || []).slice().reverse(), unread = list.filter(n => !n.read).length;
         el.innerHTML = `<button onclick="app.toggleBell()" class="relative w-9 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"><i class="fa-solid fa-bell"></i>${unread ? `<span class="absolute -top-1 -right-1 bg-rose-600 text-white text-[10px] font-bold rounded-full px-1.5">${unread}</span>` : ''}</button>
           <div id="bell-panel" class="${this._bellOpen ? '' : 'hidden'} absolute right-0 mt-2 w-72 max-h-80 overflow-y-auto bg-white border border-slate-200 rounded-2xl shadow-2xl z-40 text-xs">
-          ${list.length ? list.map(n => `<div class="p-3 border-b border-slate-100 ${n.read ? 'text-slate-500' : 'font-semibold text-slate-800 bg-indigo-50/50'}">${n.text}<div class="text-[10px] text-slate-400 font-normal">${n.at}</div></div>`).join('') : '<div class="p-4 text-slate-400 text-center">Уведомлений нет</div>'}</div>`;
+          ${list.length ? list.map(n => `<div class="p-3 border-b border-slate-100 ${n.read ? 'text-slate-500' : 'font-semibold text-slate-800 bg-indigo-50/50'}">${this.esc(n.text)}<div class="text-[10px] text-slate-400 font-normal">${this.esc(n.at)}</div></div>`).join('') : '<div class="p-4 text-slate-400 text-center">Уведомлений нет</div>'}</div>`;
       }
 
       async toggleBell() {
@@ -863,10 +908,10 @@
         if (!listEl) return;
 
         listEl.innerHTML = this.stops.filter(s => this.isAssigned(s)).map(s => `
-          <div onclick="app.selectInspectorStop('${s.id}')" class="p-3 rounded-xl border border-slate-200 hover:border-blue-400 bg-white hover:bg-blue-50/50 cursor-pointer transition-colors flex items-center justify-between text-xs">
+          <div onclick="app.selectInspectorStop('${this.esc(s.id)}')" class="p-3 rounded-xl border border-slate-200 hover:border-blue-400 bg-white hover:bg-blue-50/50 cursor-pointer transition-colors flex items-center justify-between text-xs">
             <div>
-              <div class="font-bold text-slate-800">${s.name}</div>
-              <div class="text-[10px] text-slate-500">${s.city} • ${s.district}</div>
+              <div class="font-bold text-slate-800">${this.esc(s.name)}</div>
+              <div class="text-[10px] text-slate-500">${this.esc(s.city)} • ${this.esc(s.district)}</div>
             </div>
             <span class="px-2 py-0.5 rounded text-[10px] font-bold ${s.status === 'good' ? 'bg-emerald-100 text-emerald-800' : (s.status === 'warning' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800')}">
               ${s.status === 'good' ? 'Исправно' : (s.status === 'warning' ? 'Внимание' : 'Авария')}
@@ -1036,9 +1081,9 @@
         const stopsInCity = this.stops.filter(s => s.city.toLowerCase() === (currentCity || '').toLowerCase());
 
         if (stopsInCity.length === 0) {
-          stopSelect.innerHTML = `<option value="">В вашем городе (${currentCity}) пока нет остановок в реестре</option>`;
+          stopSelect.innerHTML = `<option value="">В вашем городе (${this.esc(currentCity)}) пока нет остановок в реестре</option>`;
         } else {
-          stopSelect.innerHTML = stopsInCity.map(s => `<option value="${s.id}">${s.name} (${s.district})</option>`).join('');
+          stopSelect.innerHTML = stopsInCity.map(s => `<option value="${this.esc(s.id)}">${this.esc(s.name)} (${this.esc(s.district)})</option>`).join('');
         }
       }
 
@@ -1102,18 +1147,19 @@
 
         container.innerHTML = myTickets.map(t => {
           const st = statusTimeline[t.status] || statusTimeline.new;
+          const photoUrl = this.safePhoto(t.photo);
           return `
             <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
               <div class="flex items-start justify-between gap-3">
                 <div>
-                  <span class="text-xs font-mono font-bold text-indigo-600">${t.id}</span>
-                  <h3 class="text-sm font-bold text-slate-900 mt-0.5">${t.stopName}</h3>
-                  <div class="text-[11px] text-slate-500">${t.category} &bull; ${t.city} &bull; ${t.createdDate}</div>
+                  <span class="text-xs font-mono font-bold text-indigo-600">${this.esc(t.id)}</span>
+                  <h3 class="text-sm font-bold text-slate-900 mt-0.5">${this.esc(t.stopName)}</h3>
+                  <div class="text-[11px] text-slate-500">${this.esc(t.category)} &bull; ${this.esc(t.city)} &bull; ${this.esc(t.createdDate)}</div>
                 </div>
                 <span class="px-2.5 py-1 rounded-full text-[10px] font-bold whitespace-nowrap ${st.badge}">${st.label}</span>
               </div>
-              ${t.description ? `<p class="text-[11px] text-slate-600 bg-slate-50 rounded-xl p-2.5 border border-slate-100">${t.description}</p>` : ''}
-              ${t.photo ? `<img src="${t.photo}" class="w-full h-36 object-cover rounded-xl border border-slate-200" alt="Фото обращения">` : ''}
+              ${t.description ? `<p class="text-[11px] text-slate-600 bg-slate-50 rounded-xl p-2.5 border border-slate-100">${this.esc(t.description)}</p>` : ''}
+              ${photoUrl ? `<img src="${photoUrl}" class="w-full h-36 object-cover rounded-xl border border-slate-200" alt="Фото обращения">` : ''}
               <div class="grid grid-cols-4 gap-2 pt-1">
                 <div class="h-1.5 rounded-full ${st.step >= 1 ? 'bg-indigo-600' : 'bg-slate-200'}"></div>
                 <div class="h-1.5 rounded-full ${st.step >= 2 ? 'bg-indigo-600' : 'bg-slate-200'}"></div>
@@ -1121,9 +1167,9 @@
                 <div class="h-1.5 rounded-full ${st.step >= 4 ? 'bg-emerald-500' : 'bg-slate-200'}"></div>
               </div>
               <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                <span>Подрядчик: <strong>${t.contractor}</strong></span>
-                <span>Регламентный срок (SLA): <strong>${t.sla}</strong></span>
-                <button onclick="app.showOnMap('${t.stopId}')" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] rounded-lg transition-colors"><i class="fa-solid fa-map-location-dot mr-1"></i>Показать на карте</button>
+                <span>Подрядчик: <strong>${this.esc(t.contractor)}</strong></span>
+                <span>Регламентный срок (SLA): <strong>${this.esc(t.sla)}</strong></span>
+                <button onclick="app.showOnMap('${this.esc(t.stopId)}')" class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] rounded-lg transition-colors"><i class="fa-solid fa-map-location-dot mr-1"></i>Показать на карте</button>
               </div>
             </div>
           `;
@@ -1136,15 +1182,15 @@
 
         tbody.innerHTML = this.stops.map(s => `
           <tr class="hover:bg-slate-50 transition-colors">
-            <td class="p-3.5"><div class="font-bold text-slate-800">${s.name}</div><div class="text-[10px] text-slate-400 font-mono">ID: ${s.id}</div></td>
-            <td class="p-3.5"><div class="font-semibold text-slate-700">${s.city}</div><div class="text-[10px] text-slate-400">${s.district}</div></td>
-            <td class="p-3.5 max-w-xs truncate">${s.routes}</td>
-            <td class="p-3.5"><div class="text-[11px] text-slate-500">${(s.equipment || []).slice(0, 3).join(', ')}${(s.equipment || []).length > 3 ? '...' : ''}</div></td>
+            <td class="p-3.5"><div class="font-bold text-slate-800">${this.esc(s.name)}</div><div class="text-[10px] text-slate-400 font-mono">ID: ${this.esc(s.id)}</div></td>
+            <td class="p-3.5"><div class="font-semibold text-slate-700">${this.esc(s.city)}</div><div class="text-[10px] text-slate-400">${this.esc(s.district)}</div></td>
+            <td class="p-3.5 max-w-xs truncate">${this.esc(s.routes)}</td>
+            <td class="p-3.5"><div class="text-[11px] text-slate-500">${(s.equipment || []).slice(0, 3).map(e => this.esc(e)).join(', ')}${(s.equipment || []).length > 3 ? '...' : ''}</div></td>
             <td class="p-3.5"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${s.status === 'good' ? 'bg-emerald-100 text-emerald-800' : (s.status === 'warning' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800')}">${s.status === 'good' ? 'Исправно' : (s.status === 'warning' ? 'Внимание' : 'Аварийно')}</span></td>
             <td class="p-3.5 text-right whitespace-nowrap">
-              <button onclick="app.showOnMap('${s.id}')" class="w-7 h-7 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Показать на карте"><i class="fa-solid fa-map-location-dot"></i></button>
-              <button onclick="app.editStop('${s.id}')" class="w-7 h-7 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Редактировать"><i class="fa-solid fa-pen"></i></button>
-              <button onclick="app.confirmDeleteStop('${s.id}')" class="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Списать остановку"><i class="fa-solid fa-trash"></i></button>
+              <button onclick="app.showOnMap('${this.esc(s.id)}')" class="w-7 h-7 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Показать на карте"><i class="fa-solid fa-map-location-dot"></i></button>
+              <button onclick="app.editStop('${this.esc(s.id)}')" class="w-7 h-7 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors" title="Редактировать"><i class="fa-solid fa-pen"></i></button>
+              <button onclick="app.confirmDeleteStop('${this.esc(s.id)}')" class="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors" title="Списать остановку"><i class="fa-solid fa-trash"></i></button>
             </td>
           </tr>
         `).join('');
@@ -1390,16 +1436,16 @@
         tbody.innerHTML = this.users.map(u => {
           const self = u.id === this.currentUser?.id;
           const roleCell = admin && !self
-            ? `<select onchange="app.changeUser('${u.id}', { role: this.value })" class="text-[11px] font-bold border border-slate-300 rounded-lg px-2 py-1 bg-white">${Object.entries(roleLabels).map(([k, v]) => `<option value="${k}" ${k === u.role ? 'selected' : ''}>${v}</option>`).join('')}</select>`
-            : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">${roleLabels[u.role] || u.role}</span>`;
+            ? `<select onchange="app.changeUser('${this.esc(u.id)}', { role: this.value })" class="text-[11px] font-bold border border-slate-300 rounded-lg px-2 py-1 bg-white">${Object.entries(roleLabels).map(([k, v]) => `<option value="${k}" ${k === u.role ? 'selected' : ''}>${v}</option>`).join('')}</select>`
+            : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700">${this.esc(roleLabels[u.role] || u.role)}</span>`;
           const on = u.active !== false;
           const statCell = admin && !self
-            ? `<button onclick="app.changeUser('${u.id}', { active: ${!on} })" class="text-[11px] font-semibold ${on ? 'text-emerald-600' : 'text-rose-600'} hover:underline"><i class="fa-solid ${on ? 'fa-circle-check' : 'fa-ban'} text-[10px] mr-1"></i>${on ? 'Активен' : 'Заблокирован'}</button>`
+            ? `<button onclick="app.changeUser('${this.esc(u.id)}', { active: ${!on} })" class="text-[11px] font-semibold ${on ? 'text-emerald-600' : 'text-rose-600'} hover:underline"><i class="fa-solid ${on ? 'fa-circle-check' : 'fa-ban'} text-[10px] mr-1"></i>${on ? 'Активен' : 'Заблокирован'}</button>`
             : `<span class="text-emerald-600 font-semibold"><i class="fa-solid fa-circle-check text-[10px] mr-1"></i> Активен</span>`;
           return `<tr class="hover:bg-slate-50 transition-colors">
-            <td class="p-3.5 font-bold text-slate-800">${u.name}</td>
-            <td class="p-3.5 font-mono text-slate-600">${u.email || '—'}</td>
-            <td class="p-3.5"><span class="font-semibold text-slate-700">${u.city || '—'}</span>${admin && !self && u.role === 'inspector' ? `<input value="${u.district || ''}" title="Закреплённый район" onchange="app.changeUser('${u.id}', { district: this.value.trim() })" class="text-[10px] border border-slate-300 rounded px-1.5 py-0.5 mt-1 w-32">` : `<span class="text-[10px] text-slate-400 block">${u.district || '—'}</span>`}</td>
+            <td class="p-3.5 font-bold text-slate-800">${this.esc(u.name)}</td>
+            <td class="p-3.5 font-mono text-slate-600">${this.esc(u.email || '—')}</td>
+            <td class="p-3.5"><span class="font-semibold text-slate-700">${this.esc(u.city || '—')}</span>${admin && !self && u.role === 'inspector' ? `<input value="${this.esc(u.district || '')}" title="Закреплённый район" onchange="app.changeUser('${this.esc(u.id)}', { district: this.value.trim() })" class="text-[10px] border border-slate-300 rounded px-1.5 py-0.5 mt-1 w-32">` : `<span class="text-[10px] text-slate-400 block">${this.esc(u.district || '—')}</span>`}</td>
             <td class="p-3.5">${roleCell}</td><td class="p-3.5">${statCell}</td></tr>`;
         }).join('');
       }

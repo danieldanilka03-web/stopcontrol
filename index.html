@@ -63,38 +63,43 @@
           </div>
 
           <div class="grid grid-cols-2 gap-2 text-left">
-            <button onclick="app.demoLogin('admin')" class="flex items-center gap-2.5 p-2.5 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100/80 transition-all text-xs text-rose-950 group">
+            <button type="button" onclick="app.demoLogin('admin')" title="Email: alexeev@transcontrol.gov | Пароль: demo1234" class="flex items-center gap-2.5 p-2.5 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100/80 transition-all text-xs text-rose-950 group">
               <span class="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center shrink-0 font-bold shadow-sm"><i class="fa-solid fa-shield-halved"></i></span>
               <div class="min-w-0">
                 <div class="font-bold truncate text-[11px] group-hover:text-rose-700">Администратор</div>
                 <div class="text-[10px] text-rose-700 truncate">Алексеев М. С.</div>
+                <div class="text-[9px] text-slate-400 font-mono truncate">alexeev@transcontrol.gov</div>
               </div>
             </button>
 
-            <button onclick="app.demoLogin('dispatcher')" class="flex items-center gap-2.5 p-2.5 rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100/80 transition-all text-xs text-amber-950 group">
+            <button type="button" onclick="app.demoLogin('dispatcher')" title="Email: kovaleva@transcontrol.gov | Пароль: demo1234" class="flex items-center gap-2.5 p-2.5 rounded-xl border border-amber-200 bg-amber-50/70 hover:bg-amber-100/80 transition-all text-xs text-amber-950 group">
               <span class="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 font-bold shadow-sm"><i class="fa-solid fa-headset"></i></span>
               <div class="min-w-0">
                 <div class="font-bold truncate text-[11px] group-hover:text-amber-700">Диспетчер ЦДС</div>
                 <div class="text-[10px] text-amber-700 truncate">Ковалева Е. Н.</div>
+                <div class="text-[9px] text-slate-400 font-mono truncate">kovaleva@transcontrol.gov</div>
               </div>
             </button>
 
-            <button onclick="app.demoLogin('inspector')" class="flex items-center gap-2.5 p-2.5 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100/80 transition-all text-xs text-blue-950 group">
+            <button type="button" onclick="app.demoLogin('inspector')" title="Email: smirnov@transcontrol.gov | Пароль: demo1234" class="flex items-center gap-2.5 p-2.5 rounded-xl border border-blue-200 bg-blue-50/70 hover:bg-blue-100/80 transition-all text-xs text-blue-950 group">
               <span class="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 font-bold shadow-sm"><i class="fa-solid fa-clipboard-check"></i></span>
               <div class="min-w-0">
                 <div class="font-bold truncate text-[11px] group-hover:text-blue-700">Инспектор</div>
                 <div class="text-[10px] text-blue-700 truncate">Смирнов А. В.</div>
+                <div class="text-[9px] text-slate-400 font-mono truncate">smirnov@transcontrol.gov</div>
               </div>
             </button>
 
-            <button onclick="app.demoLogin('citizen')" class="flex items-center gap-2.5 p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/80 transition-all text-xs text-emerald-950 group">
+            <button type="button" onclick="app.demoLogin('citizen')" title="Email: ivanov@mail.ru | Пароль: demo1234" class="flex items-center gap-2.5 p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/80 transition-all text-xs text-emerald-950 group">
               <span class="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 font-bold shadow-sm"><i class="fa-solid fa-user"></i></span>
               <div class="min-w-0">
                 <div class="font-bold truncate text-[11px] group-hover:text-emerald-700">Житель города</div>
                 <div class="text-[10px] text-emerald-700 truncate">Иванов С. П.</div>
+                <div class="text-[9px] text-slate-400 font-mono truncate">ivanov@mail.ru</div>
               </div>
             </button>
           </div>
+          <div class="mt-2 text-center text-[10px] text-slate-400">Пароль для всех демо-пользователей: <span class="font-mono font-semibold text-slate-600">demo1234</span></div>
         </div>
       </div>
 
@@ -337,7 +342,7 @@
             </div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
 
             <div class="bg-slate-200/60 p-3.5 rounded-2xl flex flex-col border border-slate-200 min-h-[460px]">
               <div class="flex items-center justify-between pb-2.5 border-b border-slate-300/70 mb-3">
